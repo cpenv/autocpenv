@@ -1,0 +1,39 @@
+[Enabled]
+Type=boolean
+Category=Options
+CategoryOrder=0
+Index=0
+Label=Enabled
+Default=false
+Description=If this event plugin is enabled.
+
+[Environment]
+Type=folder
+Category=Options
+CategoryOrder=0
+Index=1
+Label=Environment
+Default=
+Required=true
+Description=The path to the cpenv virtual environment to activate before each
+task.
+
+[ModuleMapping]
+Type=multilinestring
+Category=Options
+CategoryOrder=0
+Index=2
+Label=Application Module Mapping
+Required=true
+Default=
+Description=Mapping of deadline plugins to cpenv application modules. Each line should start with a deadline plugin and end with a space separate list of cpenv application modules.
+
+[Logging]
+Type=enum
+Values=all;garbage;trace;debug;info;warning;error;critical;quiet;
+Category=Options
+CategoryOrder=0
+Index=3
+Default=info
+Label=Verbose Logging Level
+Description=The level of verbose logging Salt will provide.
