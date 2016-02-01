@@ -32,8 +32,8 @@ Options
 - Enabled: set to True to enable autocpenv
 - Environment: path to the cpenv environment you'd like to use
 - Application Module Mapping: defines which cpenv environment module to activate for each Deadline Plugin
-  - Each line configures a Deadline Plugin
-  - **{Deadline_Plugin}={cpenv_module}**
+ - Each line configures a Deadline Plugin
+ - **{Deadline_Plugin}={cpenv_module}**
 - Verbose Logging Level: logging level
 
 Documentation
