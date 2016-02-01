@@ -1,28 +1,13 @@
 # -*- coding: utf-8 -*-
 
-from .packages import yaml, click
+from .packages import click
 from . import api, shell
-from .util import unipath
-import shutil
+from .cache import EnvironmentCache
 import sys
 import logging
 
 logger = logging.getLogger('cpenv')
 echo = click.echo
-
-
-def is_path(input_str):
-    return '\\' in input_str or '/' in input_str
-
-
-def get_environments(name_or_path):
-    '''Wraps api.get_environments to take one argument that can be either the
-    name or root of an environment.'''
-
-    if is_path(name_or_path):
-        return api.get_environments(root=name_or_path)
-    else:
-        return api.get_environments(name=name_or_path)
 
 
 def list_environments():
@@ -36,13 +21,13 @@ def list_environments():
         echo('Available Environments:')
         echo('')
         for env in envs:
-            echo('    [{}] {}'.format(env.name, env.root))
+            echo('    [{}] {}'.format(env.name, env.path))
         echo('')
         echo('cpenv activate <name_or_path>')
 
 
 def list_modules():
-    '''List available application modules.'''
+    '''List available application modules'''
 
     active_env = api.get_active_env()
     if not active_env:
@@ -51,8 +36,8 @@ def list_modules():
 
     echo('Available Application Modules:')
     echo('')
-    for app in active_env.get_application_modules():
-        echo('    [{}] {}'.format(app.name, app.command))
+    for mod in active_env.get_modules():
+        echo('    [{}] {}'.format(mod.name, mod.command))
     echo('')
     echo('cpenv launch <module_name>')
 
@@ -66,7 +51,7 @@ def cli():
 @click.argument('name_or_path', required=True)
 @click.argument('module_repo', required=False)
 @click.option('--module', required=False, is_flag=True, default=False)
-@click.option('--config', required=False, type=click.Path(exists=True))
+@click.option('--config', required=False)
 def create(name_or_path, module_repo, module, config):
     '''Create a new virtual environment.'''
 
@@ -74,35 +59,32 @@ def create(name_or_path, module_repo, module, config):
 
         if not module_repo:
             echo('Pass the path to a repo when creating an app module')
-            echo('cpenv create --module maya2016 https://git@github.com/cpenv/maya_module.git')
+            echo('cpenv create --module maya2016 '
+                 'https://git@github.com/cpenv/maya_module.git')
 
         active_env = api.get_active_env()
         if not active_env:
             echo('No active environment...')
             return
 
-        active_env.add_application_module(module_repo, name_or_path)
+        active_env.add_module(name_or_path, module_repo)
         return
 
     echo('Creating new environment ' + name_or_path)
     if config:
-        config = unipath(config)
         echo('Using configuration ' + config)
 
-    if is_path(name_or_path):
-        env = api.create_environment(root=name_or_path, config=config)
-    else:
-        env = api.create_environment(name=name_or_path, config=config)
+    env = api.create(name_or_path, config=config)
 
     echo('Activating ' + env.name)
-    env.activate()
+    api.activate(env)
     sys.exit(shell.launch(prompt_prefix=env.name))
 
 
 @cli.command()
 @click.option('--config', required=False, type=click.Path(exists=True))
 def update(config):
-    '''Update a virtual environment.'''
+    '''Update a virtual environment'''
 
     active_env = api.get_active_env()
     if not active_env:
@@ -117,7 +99,7 @@ def update(config):
 @click.argument('name_or_path', required=False)
 @click.option('--module', required=False, is_flag=True, default=False)
 def remove(name_or_path, module):
-    '''Remove a virtual environment.'''
+    '''Remove a virtual environment'''
 
     if not name_or_path and not module:
         list_environments()
@@ -134,62 +116,52 @@ def remove(name_or_path, module):
             echo('No active environment...')
             return
 
-        active_env.rem_application_module(name_or_path)
+        active_env.rem_module(name_or_path)
         return
 
-    envs = get_environments(name_or_path)
-
-    if len(envs) > 1:
-        echo('More then one environment matches {}...'.format(envs[0].name))
+    try:
+        env = api.get_environment(name_or_path)
+    except NameError:
+        echo('No environment matches {}...'.format(name_or_path))
         list_environments()
         return
 
-    env = envs[0]
-    echo('Delete {}? (y/n)'.format(env.root))
-    do_delete = True if raw_input() == 'y' else False
-    if not do_delete:
+    if not click.confirm('Delete {}?'.format(env.path)):
         return
 
-    echo('Removing environment ' + env.root)
+    echo('Removing environment ' + env.path)
     env.remove()
 
 
 @cli.command()
-@click.argument('name_or_path', required=False)
+@click.argument('paths', nargs=-1, required=False)
 @click.option('--clear_cache', help='Clear path cache.', required=False,
               is_flag=True, default=False)
-def activate(name_or_path, clear_cache):
-    '''Activate a virtual environment.'''
+def activate(paths, clear_cache):
+    '''Activate a virtual environment'''
 
     if clear_cache:
-        echo('Clear environment path cache? (y/n)')
         echo('Any paths not in CPENV_HOME will no longer be callable by name.')
-        do_clear = True if raw_input() == 'y' else False
-        if do_clear:
-            api.CACHE.clear()
-            api.CACHE.save()
+        if click.confirm('Clear environment path cache?'):
+            EnvironmentCache.clear()
+            EnvironmentCache.save()
         return
 
-    if not name_or_path:
+    if not paths:
         list_environments()
         return
 
-    envs = get_environments(name_or_path)
-
-    if len(envs) > 1:
-        echo('More then one environment matches {}...'.format(envs[0].name))
-        list_environments()
-        return
-
-    env = envs[0]
-    echo('Activating ' + env.name)
-    env.activate()
-    sys.exit(shell.launch(prompt_prefix=env.name))
+    echo('Activating ' + ' '.join(paths))
+    api.activate(*paths)
+    env = api.get_active_env()
+    prompt_prefix = ':'.join([env.name] + env.active_modules())
+    sys.exit(shell.launch(prompt_prefix=prompt_prefix))
 
 
 @cli.command()
 @click.argument('module_name', required=False)
-def launch(module_name):
+@click.argument('args', nargs=-1, required=False)
+def launch(module_name, args):
     '''Launch an application module'''
 
     if not module_name:
@@ -201,11 +173,11 @@ def launch(module_name):
         echo('You must activate an environment first...')
         return
 
-    modules = active_env.get_application_modules()
-    for mod in modules:
-        if mod.name == module_name:
-            mod.launch()
-            return
+    try:
+        api.launch(module_name)
+        return
+    except NameError:
+        pass
 
     echo('Application module named {} does not exist...'.format(module_name))
     list_modules()

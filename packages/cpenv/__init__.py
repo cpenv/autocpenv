@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 __title__ = 'cpenv'
-__version__ = '0.1.16'
+__version__ = '0.2.35'
 __author__ = 'Dan Bradham'
 __email__ = 'danielbradham@gmail.com'
 __url__ = 'http://github.com/cpenv/cpenv'
@@ -13,7 +13,7 @@ import sys
 import os
 
 platform = sys.platform.rstrip('1234567890').lower()
-if platform == 'darwin': # Use osx instead of darwin
+if platform == 'darwin':  # Use osx instead of darwin
     platform = 'osx'
 os.environ['CPENV_PLATFORM'] = platform
 

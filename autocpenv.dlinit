@@ -1,5 +1,5 @@
 ﻿enabled=false
-Environment=Y:/BNS_Pipeline/environments/win/production
+Environment=Y:/BNS_Pipeline/environments/nike_xpress
 Logging=all
 Enabled=True
 ModuleMapping=MayaCmd=maya2016;MayaBatch=maya2016

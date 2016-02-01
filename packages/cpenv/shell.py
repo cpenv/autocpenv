@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
 from . import platform
-from .util import binpath
+from .log import logger
+from .utils import binpath
 import os
-import sys
 import subprocess
 
 
@@ -14,10 +14,10 @@ def run(*args, **kwargs):
     kwargs.setdefault('shell', True)
 
     try:
-        subprocess.check_call(args, **kwargs)
+        subprocess.check_call(' '.join(args), **kwargs)
         return True
-    except subprocess.CalledProcessError, e:
-        print str(e)
+    except subprocess.CalledProcessError:
+        logger.debug('Error running: {}'.format(args))
         return False
 
 
@@ -58,9 +58,9 @@ def prompt(prefix=None, colored=True):
     else:
         if colored:
             return (
-                '[{0}] ' # White prefix
-                '\\[\\033[01;32m\\]\\u@\\h\\[\\033[00m\\] ' # Green user@host
-                '\\[\\033[01;34m\\]\\w $ \\[\\033[00m\\]' # Blue cwd $
+                '[{0}] '  # White prefix
+                '\\[\\033[01;32m\\]\\u@\\h\\[\\033[00m\\] '  # Green user@host
+                '\\[\\033[01;34m\\]\\w $ \\[\\033[00m\\]'  # Blue cwd $
             ).format(prefix)
         return '[{0}] \\u@\\h \\w $ '.format(prefix)
 

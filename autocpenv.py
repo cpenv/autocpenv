@@ -8,6 +8,7 @@ from Deadline.Slaves import *
 
 import sys
 import os
+import pprint
 import textwrap
 
 
@@ -21,24 +22,24 @@ def CleanupDeadlineEventListener(eventListener):
 
 class AutoCpenv(DeadlineEventListener):
     '''
-    Listen for OnSlaveRendering events then activate the configured cpenv
+    Listen for OnJobStarted events then activate the configured cpenv
     environments and modules.
     '''
 
     def __init__(self):
-        self.OnSlaveRenderingCallback += self.OnSlaveRendering
+        self.OnJobStartedCallback += self.OnJobStarted
 
     def Cleanup(self):
-        del self.OnSlaveRenderingCallback
+        del self.OnJobStartedCallback
 
     def configure(self):
         sys.path.insert(1, os.path.join(self.GetEventDirectory(), 'packages'))
 
-    def OnSlaveRendering(self, slave_name, job):
+    def OnJobStarted(self, job):
 
         self.configure()
-        from cpenv.api import (VirtualEnvironment, ApplicationModule,
-                               get_home_environment)
+        import cpenv
+        from cpenv.utils import env_to_dict, join_dicts, dict_to_env
 
         environment = self.GetConfigEntry('Environment')
         if not environment:
@@ -52,32 +53,33 @@ class AutoCpenv(DeadlineEventListener):
 
         job_plugin = job.JobPlugin
         module_mapping = module_mapping_to_dict(module_mapping_str)
+        module = module_mapping.get(job_plugin, None)[0]
 
-        if job_plugin in module_mapping:
-            if os.path.exists(environment):
-                env = VirtualEnvironment(environment)
-            else:
-                env = get_home_environment(environment)
-            log('Activating ' + env.name)
-            env.activate()
+        if module:
+            log('Setting Environment: {}, {}'.format(environment, module))
 
-            modules = module_mapping[job_plugin]
-            for mod in modules:
-                module = env.get_application_module(mod)
-                log('including module ' + module.name)
-                module.activate()
+            # Resolve cpenv environment and module
+            r = cpenv.resolve(environment, module)
 
-            for k, v in os.environ.items():
+            # Combine cpenv environment with current job environment
+            env = r.combine()
+            job_env = env_to_dict(get_job_env(job))
+            new_env = dict_to_env(join_dicts(job_env, env))
+
+            # Set new job environment key values
+            for k, v in new_env.items():
+                log(': '.join([k, v]))
                 job.SetJobEnvironmentKeyValue(k, v)
 
 
+def get_job_env(job):
+    env = {}
+    for k in job.GetJobEnvironmentKeys():
+        env[k] = job.GetJobEnvironmentKeyValue(k)
+    return env
+
 def log(msg):
-    msg = textwrap.fill(
-        'AUTOCPENV: {}'.format(msg),
-        initial_indent='',
-        subsequent_indent='    '
-    )
-    ClientUtils.LogText(msg)
+    ClientUtils.LogText('AUTOCPENV: {}'.format(msg))
 
 
 def module_mapping_to_dict(module_mapping):

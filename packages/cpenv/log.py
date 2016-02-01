@@ -5,9 +5,9 @@ Logging Configuration
 =====================
 '''
 
-import os
 import logging
-from .util import unipath
+import os
+from .utils import unipath
 
 logger = logging.getLogger('cpenv')
 logger.setLevel(logging.DEBUG)
@@ -17,7 +17,10 @@ sh.setLevel(logging.DEBUG)
 sh_formatter = logging.Formatter('\n%(message)s')
 sh.setFormatter(sh_formatter)
 
-fh = logging.FileHandler(unipath('~/cpenv.log'))
+user_cpenv = unipath('~/.cpenv')
+if not os.path.exists(user_cpenv):
+    os.mkdir(user_cpenv)
+fh = logging.FileHandler(unipath(user_cpenv, 'cpenv.log'))
 fh.setLevel(logging.ERROR)
 fh_formatter = logging.Formatter(
     '[%(asctime)s in %(module)s.%(funcName)s @%(lineno)s]\n'
