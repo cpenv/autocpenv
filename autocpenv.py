@@ -22,20 +22,20 @@ def CleanupDeadlineEventListener(eventListener):
 
 class AutoCpenv(DeadlineEventListener):
     '''
-    Listen for OnJobStarted events then activate the configured cpenv
+    Listen for OnSlaveStartingJob events then activate the configured cpenv
     environments and modules.
     '''
 
     def __init__(self):
-        self.OnJobStartedCallback += self.OnJobStarted
+        self.OnSlaveStartingJobCallback += self.OnSlaveStartingJob
 
     def Cleanup(self):
-        del self.OnJobStartedCallback
+        del self.OnSlaveStartingJobCallback
 
     def configure(self):
         sys.path.insert(1, os.path.join(self.GetEventDirectory(), 'packages'))
 
-    def OnJobStarted(self, job):
+    def OnSlaveStartingJob(self, slave_name, job):
 
         self.configure()
         import cpenv
@@ -43,11 +43,12 @@ class AutoCpenv(DeadlineEventListener):
 
         environment = self.GetConfigEntry('Environment')
         if not environment:
-            ClientUtils.LogText('No environment specified...')
+            self.LogInfo(msg('No module mapping specified...'))
             return
 
         module_mapping_str = self.GetConfigEntry('ModuleMapping')
         if not module_mapping_str:
+            self.LogInfo(msg('No module mapping specified...'))
             log('No module mapping specified...')
             return
 
@@ -56,7 +57,7 @@ class AutoCpenv(DeadlineEventListener):
         module = module_mapping.get(job_plugin, None)[0]
 
         if module:
-            log('Setting Environment: {}, {}'.format(environment, module))
+            self.LogInfo(msg('Setting Environment: {}, {}'.format(environment, module)))
 
             # Resolve cpenv environment and module
             r = cpenv.resolve(environment, module)
@@ -68,7 +69,7 @@ class AutoCpenv(DeadlineEventListener):
 
             # Set new job environment key values
             for k, v in new_env.items():
-                log(': '.join([k, v]))
+                self.LogInfo(': '.join([k, v]))
                 job.SetJobEnvironmentKeyValue(k, v)
 
 
@@ -78,8 +79,8 @@ def get_job_env(job):
         env[k] = job.GetJobEnvironmentKeyValue(k)
     return env
 
-def log(msg):
-    ClientUtils.LogText('AUTOCPENV: {}'.format(msg))
+def msg(message):
+    return'AUTOCPENV: {}'.format(message)
 
 
 def module_mapping_to_dict(module_mapping):
