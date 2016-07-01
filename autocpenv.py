@@ -33,6 +33,8 @@ class AutoCpenv(DeadlineEventListener):
         del self.OnJobSubmittedCallback
 
     def configure_cpenv(self):
+        '''Configure cpenv python package'''
+
         cpenv_home = self.GetConfigEntry('cpenv_home')
         if not cpenv_home:
             self.log('Missing required field: CPENV_HOME')
@@ -116,10 +118,14 @@ class AutoCpenv(DeadlineEventListener):
             RepositoryUtils.SaveJob(job)
 
     def log(self, message):
+        '''Log Info method prepends AUTOCPENV: to logging messages'''
+
         self.LogInfo('AUTOCPENV: {}'.format(message))
 
 
 def get_job_env(job):
+    '''Get a jobs environment as a dictionary'''
+
     env = {}
     for k in job.GetJobEnvironmentKeys():
         env[k] = job.GetJobEnvironmentKeyValue(k)
@@ -127,6 +133,7 @@ def get_job_env(job):
 
 
 def plugin_mapping_to_dict(plugin_mapping):
+    '''Convert the plugin_mapping config entry to a dictionary'''
 
     d = {}
 
