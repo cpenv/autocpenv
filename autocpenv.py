@@ -23,54 +23,100 @@ def CleanupDeadlineEventListener(eventListener):
 class AutoCpenv(DeadlineEventListener):
     '''
     Listen for OnSlaveStartingJob events then activate the configured cpenv
-    environments and modules.
+    environment and modules.
     '''
 
     def __init__(self):
-        self.OnSlaveStartingJobCallback += self.OnSlaveStartingJob
+        self.OnJobSubmittedCallback += self.OnJobSubmitted
 
     def Cleanup(self):
-        del self.OnSlaveStartingJobCallback
+        del self.OnJobSubmittedCallback
 
-    def configure(self):
+    def configure_cpenv(self):
+        cpenv_home = self.GetConfigEntry('cpenv_home')
+        if not cpenv_home:
+            self.log('Missing required field: CPENV_HOME')
+            return False
+
+        os.environ['CPENV_HOME'] = cpenv_home
         sys.path.insert(1, os.path.join(self.GetEventDirectory(), 'packages'))
 
-    def OnSlaveStartingJob(self, slave_name, job):
+        try:
+            import cpenv
+        except ImportError:
+            return False
 
-        self.configure()
+        return True
+
+    def OnJobSubmitted(self, job):
+        plugin_mapping = self.GetConfigEntry('plugin_mapping')
+        logging = self.GetConfigEntry('logging')
+
+        if not plugin_mapping:
+            self.log('Missing required field: Plugin Mapping')
+            return
+
+        success = self.configure_cpenv()
+        if not success:
+            self.log('Failed to configure cpenv...')
+            return
+
         import cpenv
         from cpenv.utils import env_to_dict, join_dicts, dict_to_env
-
-        environment = self.GetConfigEntry('Environment')
-        if not environment:
-            self.LogInfo(msg('No module mapping specified...'))
-            return
-
-        module_mapping_str = self.GetConfigEntry('ModuleMapping')
-        if not module_mapping_str:
-            self.LogInfo(msg('No module mapping specified...'))
-            log('No module mapping specified...')
-            return
+        from cpenv.resolver import ResolveError
 
         job_plugin = job.JobPlugin
-        module_mapping = module_mapping_to_dict(module_mapping_str)
-        module = module_mapping.get(job_plugin, None)[0]
+        resolved = False
 
-        if module:
-            self.LogInfo(msg('Setting Environment: {}, {}'.format(environment, module)))
+        # Attempt to resolve the environment using the scenes root path
+        scene_file = job.GetJobPluginInfoKeyValue('SceneFile')
+        if scene_file:
+            scene_root = os.path.dirname(scene_file)
+            try:
+                r = cpenv.resolve(scene_root)
+                self.log('Resolved environment for ' + scene_root)
+                resolved = True
+            except ResolveError:
+                self.log('Failed to auto-resolve for ' + scene_root)
+                resolved = False
+
+        # If env not resolved, fall back to autocpenv plugin_mapping
+        if not resolved:
+            plugin_mapping = plugin_mapping_to_dict(plugin_mapping)
+            env_paths = plugin_mapping.get(job_plugin, None)
+
+            if not env_paths:
+                self.log('No plugin mapping for: {}'.format(job_plugin))
+                return
+
 
             # Resolve cpenv environment and module
-            r = cpenv.resolve(environment, module)
+            try:
+                r = cpenv.resolve(*env_paths)
+                resolved = True
+            except ResolveError:
+                self.log('Failed to resolve environment from autocpenv config')
+                resolved = False
 
-            # Combine cpenv environment with current job environment
-            env = r.combine()
-            job_env = env_to_dict(get_job_env(job))
-            new_env = dict_to_env(join_dicts(job_env, env))
+        if not resolved:
+            return
 
-            # Set new job environment key values
-            for k, v in new_env.items():
-                self.LogInfo(': '.join([k, v]))
-                job.SetJobEnvironmentKeyValue(k, v)
+        resolved_env = ' '.join([item.name for item in r.resolved])
+        self.log('Setting Environment: {}'.format(resolved_env))
+
+        # Combine cpenv environment with current job environment
+        env = r.combine()
+        job_env = env_to_dict(get_job_env(job))
+        new_env = dict_to_env(join_dicts(job_env, env))
+
+        # Set new job environment key values
+        for k, v in new_env.items():
+            self.LogInfo(': '.join([k, v]))
+            job.SetJobEnvironmentKeyValue(k, v)
+            RepositoryUtils.SaveJob(job)
+
+    def log(self, message):
+        self.LogInfo('AUTOCPENV: {}'.format(message))
 
 
 def get_job_env(job):
@@ -79,17 +125,13 @@ def get_job_env(job):
         env[k] = job.GetJobEnvironmentKeyValue(k)
     return env
 
-def msg(message):
-    return'AUTOCPENV: {}'.format(message)
 
-
-def module_mapping_to_dict(module_mapping):
+def plugin_mapping_to_dict(plugin_mapping):
 
     d = {}
 
-    for line in module_mapping.split(';'):
-        plugin, modules = line.split('=')
-        modules = modules.split()
-        d.setdefault(plugin, modules)
+    for line in plugin_mapping.split(';'):
+        plugin, env_paths = line.split('=')
+        d.setdefault(plugin, env_paths.split())
 
     return d
