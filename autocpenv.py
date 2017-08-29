@@ -78,8 +78,9 @@ class AutoCpenv(DeadlineEventListener):
                 r = cpenv.resolve(scene_root)
                 self.log('Resolved environment for ' + scene_root)
                 resolved = True
-            except ResolveError:
+            except ResolveError as e:
                 self.log('Failed to auto-resolve for ' + scene_root)
+                self.log(str(e))
                 resolved = False
 
         # If env not resolved, fall back to autocpenv plugin_mapping
@@ -91,13 +92,13 @@ class AutoCpenv(DeadlineEventListener):
                 self.log('No plugin mapping for: {}'.format(job_plugin))
                 return
 
-
             # Resolve cpenv environment and module
             try:
                 r = cpenv.resolve(*env_paths)
                 resolved = True
-            except ResolveError:
+            except ResolveError as e:
                 self.log('Failed to resolve environment from autocpenv config')
+                self.log(str(e))
                 resolved = False
 
         if not resolved:

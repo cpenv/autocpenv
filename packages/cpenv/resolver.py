@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
-
+'''
+cpenv.resolver
+==============
+Defines :class:`Resolver` used to resolve cpenv :class:`VirtualEnvironment` s and :class:`Module` s
+'''
 import os
 from .models import VirtualEnvironment, Module
-from .utils import (unipath, is_environment, join_dicts,
+from .utils import (unipath, is_environment, is_module, join_dicts,
                     set_env, walk_up, is_redirecting, redirect_to_env_paths)
 from .cache import EnvironmentCache
 
@@ -12,7 +16,7 @@ class ResolveError(Exception):
 
 
 class Resolver(object):
-    '''Resolve, combine, activate VirtualEnvironment and Module environments.
+    '''Resolve, combine, activate :class:`VirtualEnvironment` and :class:`Module` environments.
     The args passed can follow two possible signatures.
 
     usage::
@@ -82,7 +86,9 @@ class Resolver(object):
                 except ResolveError:
                     continue
             else:
-                raise ResolveError('Could not find an environment: ' + path)
+                raise ResolveError(
+                    'Could not resolve environment or module: ' + path
+                )
 
         return self.resolved
 
@@ -168,6 +174,20 @@ def module_resolver(resolver, path):
     raise ResolveError
 
 
+def modules_path_resolver(resolver, path):
+    '''Resolves modules in CPENV_MODULES path and CPENV_HOME/modules'''
+
+    from .api import get_module_paths
+
+    for module_dir in get_module_paths():
+        mod_path = unipath(module_dir, path)
+
+        if is_module(mod_path):
+            return Module(mod_path)
+
+    raise ResolveError
+
+
 def active_env_module_resolver(resolver, path):
     '''Resolves modules in currently active environment.'''
 
@@ -202,6 +222,7 @@ def redirect_resolver(resolver, path):
 
     raise ResolveError
 
+
 resolvers = [
     path_is_venv_resolver,
     path_resolver,
@@ -214,4 +235,5 @@ module_resolvers = [
     path_is_module_resolver,
     module_resolver,
     active_env_module_resolver,
+    modules_path_resolver
 ]

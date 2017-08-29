@@ -4,9 +4,11 @@ import os
 import tempfile
 import random
 import shlex
+import shutil
+import stat
 import sys
 from string import Template
-from .packages import yaml
+import yaml
 from . import platform
 from .compat import string_types, numeric_types
 
@@ -33,9 +35,15 @@ def is_home_environment(path):
 
 
 def is_environment(path):
-    '''Returns True if path refers to an environment or module'''
+    '''Returns True if path refers to an environment'''
 
     return os.path.exists(unipath(path, 'environment.yml'))
+
+
+def is_module(path):
+    '''Returns True if path refers to a module'''
+
+    return os.path.exists(unipath(path, 'module.yml'))
 
 
 def is_system_path(path):
@@ -47,7 +55,8 @@ def is_system_path(path):
 def is_redirecting(path):
     '''Returns True if path contains a .cpenv file'''
 
-    return os.path.exists(unipath(path, '.cpenv'))
+    candidate = unipath(path, '.cpenv')
+    return os.path.exists(candidate) and os.path.isfile(candidate)
 
 
 def redirect_to_env_paths(path):
@@ -78,6 +87,14 @@ def binpath(*paths):
     return os.path.normpath(os.path.join(package_root, 'bin', *paths))
 
 
+def ensure_path_exists(path, *args):
+    '''Like os.makedirs but keeps quiet if path already exists'''
+    if os.path.exists(path):
+        return
+
+    os.makedirs(path, *args)
+
+
 def walk_dn(start_dir, depth=10):
     '''
     Walk down a directory tree. Same as os.walk but allows for a depth limit
@@ -92,6 +109,14 @@ def walk_dn(start_dir, depth=10):
 
         if len(os.path.split(root)) >= end_depth:
             break
+
+
+def rmtree(path):
+    def onerror(func, path, _):
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+
+    shutil.rmtree(path, onerror=onerror)
 
 
 def walk_up(start_dir, depth=20):
