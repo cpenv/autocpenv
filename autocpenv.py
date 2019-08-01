@@ -156,7 +156,7 @@ class AutoCpenv(DeadlineEventListener):
         self.LogInfo('AUTOCPENV: {}'.format(message))
 
 
-def return_first_result(funcs):
+def return_first_result(*funcs):
     for func, args in funcs:
         result = func(*args)
         if result:
