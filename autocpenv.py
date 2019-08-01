@@ -10,6 +10,7 @@ import sys
 import os
 import pprint
 import textwrap
+from functools import partial
 
 
 def GetDeadlineEventListener():
@@ -41,7 +42,9 @@ class AutoCpenv(DeadlineEventListener):
             return False
 
         os.environ['CPENV_HOME'] = cpenv_home
-        sys.path.insert(1, os.path.join(self.GetEventDirectory(), 'packages'))
+        packages = os.path.join(self.GetEventDirectory(), 'packages')
+        if packages not in sys.path:
+            sys.path.insert(1, packages)
 
         try:
             import cpenv
@@ -68,47 +71,19 @@ class AutoCpenv(DeadlineEventListener):
         from cpenv.resolver import ResolveError
 
         job_plugin = job.JobPlugin
-        resolved = False
 
-        # Attempt to resolve the environment using the scenes root path
-        scene_file = job.GetJobPluginInfoKeyValue('SceneFile')
-        if scene_file:
-            scene_root = os.path.dirname(scene_file)
-            try:
-                r = cpenv.resolve(scene_root)
-                self.log('Resolved environment for ' + scene_root)
-                resolved = True
-            except ResolveError as e:
-                self.log('Failed to auto-resolve for ' + scene_root)
-                self.log(str(e))
-                resolved = False
+        # First attempt
+        resolver = return_first_result(
+            (self.resolve_from_job_environment, (job,)),
+            (self.resolve_from_job_scenefile, (job,)),
+            (self.resolve_from_job_plugin, (plugin_mapping, job_plugin))
+        )
 
-        # If env not resolved, fall back to autocpenv plugin_mapping
-        if not resolved:
-            plugin_mapping = plugin_mapping_to_dict(plugin_mapping)
-            env_paths = plugin_mapping.get(job_plugin, None)
-
-            if not env_paths:
-                self.log('No plugin mapping for: {}'.format(job_plugin))
-                return
-
-            # Resolve cpenv environment and module
-            try:
-                r = cpenv.resolve(*env_paths)
-                resolved = True
-            except ResolveError as e:
-                self.log('Failed to resolve environment from autocpenv config')
-                self.log(str(e))
-                resolved = False
-
-        if not resolved:
-            return
-
-        resolved_env = ' '.join([item.name for item in r.resolved])
+        resolved_env = ' '.join([item.name for item in resolver.resolved])
         self.log('Setting Environment: {}'.format(resolved_env))
 
         # Combine cpenv environment with current job environment
-        env = r.combine()
+        env = resolver.combine()
         job_env = env_to_dict(get_job_env(job))
         new_env = dict_to_env(join_dicts(job_env, env))
 
@@ -118,10 +93,74 @@ class AutoCpenv(DeadlineEventListener):
             job.SetJobEnvironmentKeyValue(k, v)
             RepositoryUtils.SaveJob(job)
 
+    def resolve_from_job_environment(self, job):
+
+        resolver = None
+        py_env = job.GetJobEnvironmentKeyValue('CPENV_ACTIVE')
+        modules = job.GetJobEnvironmentKeyValue('CPENV_ACTIVE_MODULES')
+        env_paths = []
+        if py_env:
+            env_paths.append(py_env)
+        if modules:
+            env_paths.append(split_path(modules))
+        if env_paths:
+            try:
+                resolver = cpenv.resolve(*env_paths)
+                self.log('Resolved from job environment.')
+            except ResolveError as e:
+                self.log('Failed to resolve environment from autocpenv config')
+                self.log(str(e))
+        else:
+            self.log('Job was not submitted with a CPENV environment.')
+
+        return resolver
+
+    def resolve_from_job_scenefile(self, job):
+
+        resolver = None
+        scene_file = job.GetJobPluginInfoKeyValue('SceneFile')
+        if scene_file:
+            scene_root = os.path.dirname(scene_file)
+            try:
+                resolver = cpenv.resolve(scene_root)
+                self.log('Resolved environment for ' + scene_root)
+            except ResolveError as e:
+                self.log('Failed to auto-resolve for ' + scene_root)
+                self.log(str(e))
+
+        return resolver
+
+    def resolve_from_job_plugin(self, plugin_mapping, job_plugin):
+
+        resolver = None
+        plugin_mapping = plugin_mapping_to_dict(plugin_mapping)
+        env_paths = plugin_mapping.get(job_plugin, None)
+
+        if not env_paths:
+            self.log('No plugin mapping for: {}'.format(job_plugin))
+            return
+
+        # Resolve cpenv environment and module
+        try:
+            resolver = cpenv.resolve(*env_paths)
+            self.log('Resolved environment using autocpenv config.')
+        except ResolveError as e:
+            self.log('Failed to resolve environment from autocpenv config')
+            self.log(str(e))
+
+        return resolver
+
     def log(self, message):
-        '''Log Info method prepends AUTOCPENV: to logging messages'''
+        '''prepends AUTOCPENV: to logging messages'''
 
         self.LogInfo('AUTOCPENV: {}'.format(message))
+
+
+def return_first_result(funcs):
+    for func, args in funcs:
+        result = func(*args)
+        if result:
+            return result
 
 
 def get_job_env(job):
@@ -131,6 +170,12 @@ def get_job_env(job):
     for k in job.GetJobEnvironmentKeys():
         env[k] = job.GetJobEnvironmentKeyValue(k)
     return env
+
+
+def split_path(path, pathsep=os.pathsep):
+    if pathsep in path:
+        return path.split(pathsep)
+    return path
 
 
 def plugin_mapping_to_dict(plugin_mapping):
