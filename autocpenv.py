@@ -94,6 +94,8 @@ class AutoCpenv(DeadlineEventListener):
             RepositoryUtils.SaveJob(job)
 
     def resolve_from_job_environment(self, job):
+        import cpenv
+        from cpenv.resolver import ResolveError
 
         resolver = None
         py_env = job.GetJobEnvironmentKeyValue('CPENV_ACTIVE')
@@ -116,6 +118,8 @@ class AutoCpenv(DeadlineEventListener):
         return resolver
 
     def resolve_from_job_scenefile(self, job):
+        import cpenv
+        from cpenv.resolver import ResolveError
 
         resolver = None
         scene_file = job.GetJobPluginInfoKeyValue('SceneFile')
@@ -131,6 +135,8 @@ class AutoCpenv(DeadlineEventListener):
         return resolver
 
     def resolve_from_job_plugin(self, plugin_mapping, job_plugin):
+        import cpenv
+        from cpenv.resolver import ResolveError
 
         resolver = None
         plugin_mapping = plugin_mapping_to_dict(plugin_mapping)
