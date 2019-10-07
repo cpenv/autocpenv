@@ -31,6 +31,7 @@ Options
 
 - State: How this event plug-in should respond to events. If Global, all jobs and slaves will trigger the events for this plugin. If Opt-In, jobs and slaves can choose to trigger the events for this plugin. If Disabled, no events are triggered for this plugin.
 - CPENV_HOME: Root path to cpenv environments
+- CPENV_MODULES: Root path to cpenv modules
 - Plugin Mapping: Mapping of deadline plugins to cpenv environments. Each line should start with a deadline plugin and end with a space separate list of cpenv environment paths.
  - Each line configures a Deadline Plugin
  - **{Deadline_Plugin}={cpenv_module}**

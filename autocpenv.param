@@ -27,7 +27,7 @@ Index=2
 Label=CPENV_MODULES
 Default=
 Required=true
-Description=Root path to cpenv modules environments
+Description=Root path to cpenv modules
 
 [plugin_mapping]
 Type=multilinestring
