@@ -37,11 +37,15 @@ class AutoCpenv(DeadlineEventListener):
         '''Configure cpenv python package'''
 
         cpenv_home = self.GetConfigEntry('cpenv_home')
+        cpenv_modules = self.GetConfigEntry('cpenv_modules')
+
         if not cpenv_home:
             self.log('Missing required field: CPENV_HOME')
             return False
 
         os.environ['CPENV_HOME'] = cpenv_home
+        os.environ['CPENV_MODULES'] = cpenv_modules
+
         packages = os.path.join(self.GetEventDirectory(), 'packages')
         if packages not in sys.path:
             sys.path.insert(1, packages)
