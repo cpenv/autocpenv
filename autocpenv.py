@@ -53,6 +53,9 @@ class AutoCpenv(DeadlineEventListener):
         try:
             import cpenv
         except ImportError:
+            import traceback
+            self.log('Failed to import cpenv...')
+            self.log(traceback.format_exc())
             return False
 
         return True
