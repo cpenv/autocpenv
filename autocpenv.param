@@ -8,7 +8,6 @@ Label=State
 Default=Disabled
 Description=How this event plug-in should respond to events. If Global, all jobs and slaves will trigger the events for this plugin. If Opt-In, jobs and slaves can choose to trigger the events for this plugin. If Disabled, no events are triggered for this plugin.
 
-
 [cpenv_home]
 Type=folder
 Category=Options
@@ -16,18 +15,9 @@ CategoryOrder=0
 Index=1
 Label=CPENV_HOME
 Default=
-Required=true
-Description=Root path to cpenv environments
-
-[cpenv_modules]
-Type=folder
-Category=Options
-CategoryOrder=0
-Index=2
-Label=CPENV_MODULES
-Default=
-Required=true
-Description=Root path to cpenv modules
+Required=false
+Description=Path to cpenv home. Defaults to a local directory. Can be set to a shared network location. Place a config.yml file within the home directory to
+configure repositories. See the cpenv documentation for more info.
 
 [plugin_mapping]
 Type=multilinestring
@@ -35,7 +25,7 @@ Category=Options
 CategoryOrder=0
 Index=3
 Label=Plugin Mapping
-Required=true
+Required=false
 Default=
 Description=Mapping of deadline plugins to cpenv environments. Each line should start with a deadline plugin and end with a space separate list of cpenv environment paths.
 
