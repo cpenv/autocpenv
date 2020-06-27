@@ -32,10 +32,52 @@ class AutoCpenv(DeadlineEventListener):
 
     def __init__(self):
         self.OnJobSubmittedCallback += self.OnJobSubmitted
+        self.OnSlaveStartingJobCallback += self.OnSlaveStartingJob
         self._log_prefix = ''
 
     def Cleanup(self):
         del self.OnJobSubmittedCallback
+        del self.OnSlaveStartingJobCallback
+
+    def log(self, message):
+        '''Wraps LogInfo to add a prefix to all log messages.'''
+
+        self.LogInfo('{}{}'.format(self._log_prefix, message))
+
+    @contextmanager
+    def log_section(self, header, prefix):
+        '''A context manager that logs a message and sets a log prefix.'''
+
+        self.log(header)
+        old_log_prefix = self._log_prefix
+        self._log_prefix = prefix
+        try:
+            yield
+        finally:
+            self._log_prefix = old_log_prefix
+
+    def OnSlaveStartingJob(self, string, job):
+        '''
+        Responsible for localizing modules for each worker when a Job is
+        picked up. If all workers are sharing a home location and local
+        repository, this method will not localize an modules.
+        '''
+
+        success = self._load_cpenv()
+        if not success:
+            self.log('Failed to load cpenv...')
+            return
+
+        import cpenv
+
+        resolved = self.resolve_from_job_environment(job)
+        if not resolved:
+            return
+
+        localizer = cpenv.Localizer(cpenv.get_repo('home'))
+        localizer.localize(resolved, overwrite=False)
+
+        self.log('Success!')
 
     def OnJobSubmitted(self, job):
         logging = self.GetConfigEntry('logging')
@@ -91,21 +133,6 @@ class AutoCpenv(DeadlineEventListener):
             RepositoryUtils.SaveJob(job)
 
         self.log('Success!')
-
-    def log(self, message):
-        '''prepends AUTOCPENV: to logging messages'''
-
-        self.LogInfo('autocpenv| {}{}'.format(self._log_prefix, message))
-
-    @contextmanager
-    def log_section(self, header, prefix):
-        self.log(header)
-        old_log_prefix = self._log_prefix
-        self._log_prefix = prefix
-        try:
-            yield
-        finally:
-            self._log_prefix = old_log_prefix
 
     def _load_cpenv(self):
         '''Configure cpenv python package'''
