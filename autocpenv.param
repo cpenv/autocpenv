@@ -15,7 +15,7 @@ CategoryOrder=0
 Index=1
 Label=CPENV_HOME
 Default=
-Required=false
+Required=False
 Description=Path to cpenv home. Defaults to a local directory. Can be set to a shared network location. Place a config.yml file within the home directory to
 configure repositories. See the cpenv documentation for more info.
 
@@ -25,16 +25,42 @@ Category=Options
 CategoryOrder=0
 Index=3
 Label=Plugin Mapping
-Required=false
+Required=False
 Default=
 Description=Mapping of deadline plugins to cpenv environments. Each line should start with a deadline plugin and end with a space separate list of cpenv environment paths.
 
-[logging]
-Type=enum
-Values=all;garbage;trace;debug;info;warning;error;critical;quiet;
-Category=Options
-CategoryOrder=0
-Index=4
-Default=info
-Label=Logging Level
-Description=The level of verbose logging Salt will provide.
+[ShotgunRepo_enable]
+Type=boolean
+Category=Repos
+CategoryOrder=1
+Index=0
+Label=Enable Shotgun Repo
+Default=False
+Description=Enable a Shotgun Repository of cpenv modules.
+
+[ShotgunRepo_base_url]
+Type=string
+Category=Repos
+CategoryOrder=1
+Index=1
+Label=Shotgun URL
+Default=
+Description=Path to Shotgun site (https://my.shotgunstudio.com)
+
+[ShotgunRepo_script_name]
+Type=string
+Category=Repos
+CategoryOrder=1
+Index=2
+Label=Api Script Name
+Default=
+Description=Name of Shotgun api script
+
+[ShotgunRepo_api_key]
+Type=string
+Category=Repos
+CategoryOrder=1
+Index=3
+Label=Api Script Key
+Default=
+Description=Key of Shotgun api script

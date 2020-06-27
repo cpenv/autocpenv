@@ -8,7 +8,6 @@ from contextlib import contextmanager
 # IronPython imports
 from System.Diagnostics import *
 from System.IO import *
-from System import TimeSpan
 
 # Deadline imports
 from Deadline.Events import *
@@ -80,7 +79,10 @@ class AutoCpenv(DeadlineEventListener):
         self.log('Success!')
 
     def OnJobSubmitted(self, job):
-        logging = self.GetConfigEntry('logging')
+        '''
+        Responsible for resolving modules and setting a Job's environment
+        variables.
+        '''
 
         job_plugin = job.JobPlugin
         plugin_mapping = self.GetConfigEntry('plugin_mapping')
@@ -137,6 +139,7 @@ class AutoCpenv(DeadlineEventListener):
     def _load_cpenv(self):
         '''Configure cpenv python package'''
 
+        self.log('Loading cpenv...')
         cpenv_home = self.GetConfigEntry('cpenv_home')
         if cpenv_home:
             os.environ['CPENV_HOME'] = cpenv_home
@@ -145,15 +148,31 @@ class AutoCpenv(DeadlineEventListener):
         if packages not in sys.path:
             sys.path.insert(1, packages)
 
-        try:
+        shotgun_repo_enable = self.GetConfigEntry('ShotgunRepo_enable')
+        shotgun_repo_kwargs = {
+            'base_url': self.GetConfigEntry('ShotgunRepo_base_url'),
+            'script_name': self.GetConfigEntry('ShotgunRepo_script_name'),
+            'api_key': self.GetConfigEntry('ShotgunRepo_api_key'),
+        }
 
+        try:
+            self.log('- Importing cpenv')
             import cpenv
 
             class _EventLogReporter(EventLogReporter, cpenv.Reporter):
                 '''Inject log method and mix with cpenv.Reporter baseclass.'''
                 log = self.log
 
+            self.log('- Initializing EventLogReporter')
             cpenv.set_reporter(_EventLogReporter)
+
+            if shotgun_repo_enable:
+                self.log('- Initializing ShotgunRepo')
+                shotgun_repo = cpenv.ShotgunRepo(
+                    name='autocpenv_shotgun',
+                    **shotgun_repo_kwargs
+                )
+                cpenv.add_repo(shotgun_repo)
 
         except ImportError:
             self.log('Failed to import cpenv...')
