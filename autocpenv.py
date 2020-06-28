@@ -31,12 +31,10 @@ class AutoCpenv(DeadlineEventListener):
 
     def __init__(self):
         self.OnJobSubmittedCallback += self.OnJobSubmitted
-        self.OnSlaveStartingJobCallback += self.OnSlaveStartingJob
         self._log_prefix = ''
 
     def Cleanup(self):
         del self.OnJobSubmittedCallback
-        del self.OnSlaveStartingJobCallback
 
     def log(self, message):
         '''Wraps LogInfo to add a prefix to all log messages.'''
@@ -54,29 +52,6 @@ class AutoCpenv(DeadlineEventListener):
             yield
         finally:
             self._log_prefix = old_log_prefix
-
-    def OnSlaveStartingJob(self, string, job):
-        '''
-        Responsible for localizing modules for each worker when a Job is
-        picked up. If all workers are sharing a home location and local
-        repository, this method will not localize an modules.
-        '''
-
-        success = self._load_cpenv()
-        if not success:
-            self.log('Failed to load cpenv...')
-            return
-
-        import cpenv
-
-        resolved = self.resolve_from_job_environment(job)
-        if not resolved:
-            return
-
-        localizer = cpenv.Localizer(cpenv.get_repo('home'))
-        localizer.localize(resolved, overwrite=False)
-
-        self.log('Success!')
 
     def OnJobSubmitted(self, job):
         '''
@@ -100,6 +75,7 @@ class AutoCpenv(DeadlineEventListener):
 
         with self.log_section('Attempting to resolve modules...', '  '):
             resolved = return_first_result(
+                (self.resolve_from_environment, (job,)),
                 (self.resolve_from_job_environment, (job,)),
                 (self.resolve_from_job_scenefile, (job,)),
                 (self.resolve_from_job_plugin, (plugin_mapping, job_plugin)),
@@ -181,8 +157,27 @@ class AutoCpenv(DeadlineEventListener):
 
         return True
 
+    def resolve_from_environment(self, job):
+        '''Checks the environment of the local machine that's submitting the
+        job for the CPENV_ACTIVE_MODULES variable.'''
+
+        import cpenv
+        self.log('Checking local environment for module requirements...')
+
+        requirements = os.getenv('CPENV_ACTIVE_MODULES')
+        if not requirements:
+            self.log('  CPENV_ACTIVE_MODULES not set...')
+            return
+
+        requirements = split_path(requirements)
+        try:
+            resolved = cpenv.resolve(requirements)
+            return resolved
+        except cpenv.ResolveError:
+            pass
+
     def resolve_from_job_environment(self, job):
-        '''Attempt to resolve modules from CPENV_ACTIVE_MODULES variable.'''
+        '''Resolve modules from job CPENV_ACTIVE_MODULES variable.'''
 
         import cpenv
         self.log('Checking job environment for module requirements...')
