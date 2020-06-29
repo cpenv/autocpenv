@@ -236,7 +236,7 @@ def GlobalJobPreLoad(plugin):
     config = RepositoryUtils.GetEventPluginConfig('autocpenv')
     home_path = config.GetConfigEntry('cpenv_home')
     if home_path:
-        os.environ['CPENV_HOME'] = home_path
+        cpenv.set_home_path(home_path)
 
     # Initialize ShotgunRepo for requirement lookups
     if config.GetConfigEntry('ShotgunRepo_enable'):
