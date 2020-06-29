@@ -2,7 +2,6 @@
 # Standard library imports
 import sys
 import os
-import traceback
 from contextlib import contextmanager
 
 # IronPython imports
@@ -13,6 +12,17 @@ from System.IO import *
 from Deadline.Events import *
 from Deadline.Scripting import *
 from Deadline.Slaves import *
+
+
+# Setup system path
+this_path = RepositoryUtils.GetEventPluginDirectory("autocpenv")
+packages_path = os.path.join(this_path, 'packages')
+if packages_path not in sys.path:
+    sys.path.insert(1, packages_path)
+
+
+import cpenv
+from cpenv import mappings
 
 
 def GetDeadlineEventListener():
@@ -65,103 +75,35 @@ class AutoCpenv(DeadlineEventListener):
             self.log('Missing required field: Plugin Mapping')
             return
 
-        success = self._load_cpenv()
-        if not success:
-            self.log('Failed to load cpenv...')
-            return
+        self.log('Attempting to find requirements...')
+        requirements = return_first_result(
+            (self.resolve_from_environment, (job,)),
+            (self.resolve_from_job_environment, (job,)),
+            (self.resolve_from_job_scenefile, (job,)),
+            (self.resolve_from_job_plugin, (plugin_mapping, job_plugin)),
+        )
 
-        import cpenv
-        from cpenv import mappings
-
-        with self.log_section('Attempting to resolve modules...', '  '):
-            resolved = return_first_result(
-                (self.resolve_from_environment, (job,)),
-                (self.resolve_from_job_environment, (job,)),
-                (self.resolve_from_job_scenefile, (job,)),
-                (self.resolve_from_job_plugin, (plugin_mapping, job_plugin)),
-            )
-
-        if not resolved:
-            self.log('Error! Failed 3 attempts to resolve modules...')
+        if not requirements:
+            self.log('Error! Failed 4 attempts to find requirements...')
             return
         else:
-            self.log('Ok! Resolved {} modules.'.format(len(resolved)))
+            self.log('Found {} requirements...'.format(len(requirements)))
+            for requirement in requirements:
+                self.log('  ' + requirement)
 
-        with self.log_section('Building job environment...', '  '):
-            localizer = cpenv.Localizer(cpenv.get_repo('home'))
-            localized = localizer.localize(resolved, overwrite=False)
+        self.log('Setting JobExtranInfo cpenv_requirements')
+        job.SetJobExtraInfoKeyValue(
+            'cpenv_requirements',
+            ' '.join(requirements)
+        )
 
-            self.log('- Combining module environment')
-            activator = cpenv.Activator(localized)
-            env = activator.combine_modules(localized)
-
-            # Combine cpenv environment with current job environment
-            job_env = mappings.env_to_dict(get_job_env(job))
-            new_job_env = mappings.dict_to_env(mappings.join_dicts(
-                job_env,
-                env,
-            ))
-
-            self.log('- Setting job environment variables')
-            for k, v in new_job_env.items():
-                self.log('  {}: {}'.format(k, v))
-                job.SetJobEnvironmentKeyValue(k, v)
-
-            self.log('- Saving Job')
-            RepositoryUtils.SaveJob(job)
-
-        self.log('Success!')
-
-    def _load_cpenv(self):
-        '''Configure cpenv python package'''
-
-        self.log('Loading cpenv...')
-        cpenv_home = self.GetConfigEntry('cpenv_home')
-        if cpenv_home:
-            os.environ['CPENV_HOME'] = cpenv_home
-
-        packages = os.path.join(self.GetEventDirectory(), 'packages')
-        if packages not in sys.path:
-            sys.path.insert(1, packages)
-
-        shotgun_repo_enable = self.GetConfigEntry('ShotgunRepo_enable')
-        shotgun_repo_kwargs = {
-            'base_url': self.GetConfigEntry('ShotgunRepo_base_url'),
-            'script_name': self.GetConfigEntry('ShotgunRepo_script_name'),
-            'api_key': self.GetConfigEntry('ShotgunRepo_api_key'),
-        }
-
-        try:
-            self.log('- Importing cpenv')
-            import cpenv
-
-            class _EventLogReporter(EventLogReporter, cpenv.Reporter):
-                '''Inject log method and mix with cpenv.Reporter baseclass.'''
-                log = self.log
-
-            self.log('- Initializing EventLogReporter')
-            cpenv.set_reporter(_EventLogReporter)
-
-            if shotgun_repo_enable:
-                self.log('- Initializing ShotgunRepo')
-                shotgun_repo = cpenv.ShotgunRepo(
-                    name='autocpenv_shotgun',
-                    **shotgun_repo_kwargs
-                )
-                cpenv.add_repo(shotgun_repo)
-
-        except ImportError:
-            self.log('Failed to import cpenv...')
-            self.log(traceback.format_exc())
-            return False
-
-        return True
+        self.log('Saving Job.')
+        RepositoryUtils.SaveJob(job)
 
     def resolve_from_environment(self, job):
         '''Checks the environment of the local machine that's submitting the
         job for the CPENV_ACTIVE_MODULES variable.'''
 
-        import cpenv
         self.log('Checking local environment for module requirements...')
 
         requirements = os.getenv('CPENV_ACTIVE_MODULES')
@@ -169,17 +111,11 @@ class AutoCpenv(DeadlineEventListener):
             self.log('  CPENV_ACTIVE_MODULES not set...')
             return
 
-        requirements = split_path(requirements)
-        try:
-            resolved = cpenv.resolve(requirements)
-            return resolved
-        except cpenv.ResolveError:
-            pass
+        return split_path(requirements)
 
     def resolve_from_job_environment(self, job):
         '''Resolve modules from job CPENV_ACTIVE_MODULES variable.'''
 
-        import cpenv
         self.log('Checking job environment for module requirements...')
 
         requirements = job.GetJobEnvironmentKeyValue('CPENV_ACTIVE_MODULES')
@@ -187,12 +123,7 @@ class AutoCpenv(DeadlineEventListener):
             self.log('  CPENV_ACTIVE_MODULES not set...')
             return
 
-        requirements = split_path(requirements)
-        try:
-            resolved = cpenv.resolve(requirements)
-            return resolved
-        except cpenv.ResolveError:
-            pass
+        return split_path(requirements)
 
     def resolve_from_job_scenefile(self, job):
         '''Attempt to resolve modules from the jobs scene_file.
@@ -200,7 +131,6 @@ class AutoCpenv(DeadlineEventListener):
         Walks up the path until a .cpenv file is found.
         '''
 
-        import cpenv
         self.log('Checking job scene file for module requirements...')
 
         scene_file = job.GetJobPluginInfoKeyValue('SceneFile')
@@ -209,38 +139,23 @@ class AutoCpenv(DeadlineEventListener):
             return
 
         requirement = os.path.dirname(scene_file)
-        try:
-            resolved = cpenv.resolve([requirement])
-            return resolved
-        except cpenv.ResolveError:
-            pass
+        return [requirement]
 
     def resolve_from_job_plugin(self, plugin_mapping, job_plugin):
         '''Attempt to resolve modules using the Autocpenv event plugins
         configured plugin mapping.
         '''
 
-        import cpenv
         self.log('Checking job plugin_mapping for module requirements...')
 
         plugin_mapping = plugin_mapping_to_dict(plugin_mapping)
         requirements = plugin_mapping.get(job_plugin, None)
-
-        if not requirements:
-            self.log('  No plugin mapping for ' + job_plugin)
-            return
-
-        try:
-            resolved = cpenv.resolve(requirements)
-            return resolved
-        except cpenv.ResolveError:
-            pass
+        return requirements
 
 
 class EventLogReporter(object):
 
-    # Injected in _load_cpenv
-    log = None
+    log = None  # Injected in GlobalJobPreLoad
 
     def start_resolve(self, requirements):
         self.log('- Resolving requirements...')
@@ -254,9 +169,6 @@ class EventLogReporter(object):
 
     def start_localize(self, module_specs):
         self.log('- Localizing modules...')
-
-    def end_localize(self, modules):
-        pass
 
     def start_progress(self, label, max_size, data):
 
@@ -284,15 +196,6 @@ def return_first_result(*funcs):
             return result
 
 
-def get_job_env(job):
-    '''Get a jobs environment as a dictionary'''
-
-    env = {}
-    for k in job.GetJobEnvironmentKeys():
-        env[k] = job.GetJobEnvironmentKeyValue(k)
-    return env
-
-
 def split_path(path, pathsep=os.pathsep):
     return [part for part in path.split(pathsep) if part]
 
@@ -307,3 +210,74 @@ def plugin_mapping_to_dict(plugin_mapping):
         d.setdefault(plugin, env_paths.split())
 
     return d
+
+
+def GlobalJobPreLoad(plugin):
+    '''Execute this method in your GlobalJobPreLoad.py file.
+
+    See GlobalJobPreLoad.py for reference. Or if you are not using a
+    GlobalJobPreLoad script simply copy the file to <repo>/custom/plugins.
+    '''
+
+    # Get job cpenv requirements
+    job = plugin.GetJob()
+    requirements = job.GetJobExtraInfoKeyValue('cpenv_requirements')
+    if not requirements:
+        plugin.LogInfo('Job has no cpenv requirements...')
+        return
+
+    # Read config from autocpenv EventPlugin
+    plugin.LogInfo('Configuring cpenv...')
+    autocpenv = RepositoryUtils.GetEventPluginDirectory('autocpenv')
+    if autocpenv not in sys.path:
+        sys.path.insert(1, autocpenv)
+        sys.path.insert(1, autocpenv + '/packages')
+
+    config = RepositoryUtils.GetEventPluginConfig('autocpenv')
+    home_path = config.GetConfigEntry('cpenv_home')
+    if home_path:
+        os.environ['CPENV_HOME'] = home_path
+
+    # Initialize ShotgunRepo for requirement lookups
+    if config.GetConfigEntry('ShotgunRepo_enable'):
+        repo = cpenv.ShotgunRepo(
+            name='autocpenv_shotgun',
+            base_url=config.GetConfigEntry('ShotgunRepo_base_url'),
+            script_name=config.GetConfigEntry('ShotgunRepo_script_name'),
+            api_key=config.GetConfigEntry('ShotgunRepo_api_key'),
+        )
+        plugin.LogInfo('Adding ShotgunRepo: ' + repo.base_url)
+        cpenv.add_repo(repo)
+
+    # Setup reporting
+    class _EventLogReporter(EventLogReporter, cpenv.Reporter):
+        '''Inject log method and mix with cpenv.Reporter baseclass.'''
+        log = plugin.LogInfo
+
+    cpenv.set_reporter(_EventLogReporter)
+
+    # Use cpenv to resolve requirements stored in ExtraInfo
+    resolved = cpenv.resolve(requirements.split())
+    localizer = cpenv.Localizer(cpenv.get_repo('home'))
+    localized = localizer.localize(resolved, overwrite=False)
+    activator = cpenv.Activator(localizer)
+    env = activator.combine_modules(localized)
+
+    # Get existing environment
+    plugin.LogInfo('Collecting process and job environment variables...')
+    proc_env = {}
+    for key in env.keys():
+        proc_env_var = plugin.GetProcessEnvironmentVariable(key)
+        if proc_env_var:
+            proc_env[key] = proc_env_var
+
+    plugin.LogInfo('Merging environment variables...')
+    new_job_env = mappings.dict_to_env(mappings.join_dicts(
+        proc_env,
+        env,
+    ))
+    new_job_env = mappings.expand_envvars(new_job_env)
+
+    plugin.LogInfo('Setting process environment variables...')
+    for k, v in new_job_env.items():
+        plugin.SetProcessEnvironmentVariable(k, v)

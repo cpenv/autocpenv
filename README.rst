@@ -7,12 +7,14 @@ Deadline Event Plugin that automatically activates a cpenv environment when a sl
 
 Installation
 ============
-Clone this git repository into your Deadline repository's custom events location::
+1. Clone this git repository into your Deadline repository's custom events location::
 
     cd DEADLINE_REPOSITORY_PATH/custom/events
     git clone https://github.com/cpenv/autocpenv.git
 
-Use git pull to upgrade autocpenv::
+2. Copy GlobalJobPreLoad.py to DEADLINE_REPOSITORY_PATH/custom/plugins or add the contents of GlobalJobPreLoad.py to your own if you're already using one.
+
+3. Use git pull to upgrade autocpenv::
 
     cd DEADLINE_REPOSITORY_PATH/custom/events/autocpenv
     git pull origin master
@@ -34,7 +36,10 @@ configure repositories. See the cpenv documentation for more info.
 - Plugin Mapping: Mapping of deadline plugins to cpenv environments. Each line should start with a deadline plugin and end with a space separate list of cpenv environment paths.
  - Each line configures a Deadline Plugin
  - **{Deadline_Plugin}={cpenv_module}**
-- Logging Level
+- Enable Shotgun Repo: `Setup a Shotgun api script <https://support.shotgunsoftware.com/hc/en-us/articles/219031368-Create-and-manage-API-scripts>`_
+ - Shotgun URL: Path to Shotgun site (https://my.shotgunstudio.com)
+ - Api Script Name
+ - Api Script Key
 
 Documentation
 =============
