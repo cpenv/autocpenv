@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
+from __future__ import print_function
+
 # Standard library imports
 import sys
 import os
-from contextlib import contextmanager
 
 # IronPython imports
 from System.Diagnostics import *
@@ -51,18 +52,6 @@ class AutoCpenv(DeadlineEventListener):
 
         self.LogInfo('{}{}'.format(self._log_prefix, message))
 
-    @contextmanager
-    def log_section(self, header, prefix):
-        '''A context manager that logs a message and sets a log prefix.'''
-
-        self.log(header)
-        old_log_prefix = self._log_prefix
-        self._log_prefix = prefix
-        try:
-            yield
-        finally:
-            self._log_prefix = old_log_prefix
-
     def OnJobSubmitted(self, job):
         '''
         Responsible for resolving modules and setting a Job's environment
@@ -71,9 +60,18 @@ class AutoCpenv(DeadlineEventListener):
 
         job_plugin = job.JobPlugin
         plugin_mapping = self.GetConfigEntry('plugin_mapping')
-        if not plugin_mapping:
-            self.log('Missing required field: Plugin Mapping')
+
+        self.log('Checking job ExtraInfo for requirements...')
+        requirements = job.GetJobExtraInfoKeyValue('cpenv_requirements')
+        if requirements:
+            requirements = requirements.split()
+            self.log('Found {} requirements...'.format(len(requirements)))
+            for requirement in requirements:
+                self.log('  ' + requirement)
             return
+
+        # read config and setup cpenv
+        configure_autocpenv(self.log)
 
         self.log('Attempting to find requirements...')
         requirements = return_first_result(
@@ -139,7 +137,11 @@ class AutoCpenv(DeadlineEventListener):
             return
 
         requirement = os.path.dirname(scene_file)
-        return [requirement]
+        try:
+            resolved = cpenv.resolve([requirement])
+            return [m.qual_name for m in resolved]
+        except cpenv.ResolveError:
+            pass
 
     def resolve_from_job_plugin(self, plugin_mapping, job_plugin):
         '''Attempt to resolve modules using the Autocpenv event plugins
@@ -212,22 +214,11 @@ def plugin_mapping_to_dict(plugin_mapping):
     return d
 
 
-def GlobalJobPreLoad(plugin):
-    '''Execute this method in your GlobalJobPreLoad.py file.
+def configure_autocpenv(log_method=None):
+    '''Read config from EventPlugin and setup cpenv.'''
 
-    See GlobalJobPreLoad.py for reference. Or if you are not using a
-    GlobalJobPreLoad script simply copy the file to <repo>/custom/plugins.
-    '''
-
-    # Get job cpenv requirements
-    job = plugin.GetJob()
-    requirements = job.GetJobExtraInfoKeyValue('cpenv_requirements')
-    if not requirements:
-        plugin.LogInfo('Job has no cpenv requirements...')
-        return
-
-    # Read config from autocpenv EventPlugin
-    plugin.LogInfo('Configuring cpenv...')
+    log_method = log_method or print
+    log_method('Configuring cpenv...')
     autocpenv = RepositoryUtils.GetEventPluginDirectory('autocpenv')
     if autocpenv not in sys.path:
         sys.path.insert(1, autocpenv)
@@ -246,15 +237,33 @@ def GlobalJobPreLoad(plugin):
             script_name=config.GetConfigEntry('ShotgunRepo_script_name'),
             api_key=config.GetConfigEntry('ShotgunRepo_api_key'),
         )
-        plugin.LogInfo('Adding ShotgunRepo: ' + repo.base_url)
+        log_method('Adding ShotgunRepo: ' + repo.base_url)
         cpenv.add_repo(repo)
 
     # Setup reporting
     class _EventLogReporter(EventLogReporter, cpenv.Reporter):
         '''Inject log method and mix with cpenv.Reporter baseclass.'''
-        log = plugin.LogInfo
+        log = log_method
 
     cpenv.set_reporter(_EventLogReporter)
+
+
+def GlobalJobPreLoad(plugin):
+    '''Execute this method in your GlobalJobPreLoad.py file.
+
+    See GlobalJobPreLoad.py for reference. Or if you are not using a
+    GlobalJobPreLoad script simply copy the file to <repo>/custom/plugins.
+    '''
+
+    # Get job cpenv requirements
+    job = plugin.GetJob()
+    requirements = job.GetJobExtraInfoKeyValue('cpenv_requirements')
+    if not requirements:
+        plugin.LogInfo('Job has no cpenv requirements...')
+        return
+
+    # Read config from autocpenv EventPlugin
+    configure_autocpenv(plugin.LogInfo)
 
     # Use cpenv to resolve requirements stored in ExtraInfo
     resolved = cpenv.resolve(requirements.split())
