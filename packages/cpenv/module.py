@@ -8,7 +8,7 @@ from collections import namedtuple
 from string import Template
 
 # Local imports
-from . import compat, mappings, paths, repos
+from . import compat, mappings, paths
 from .versions import ParseError, Version, default_version, parse_version
 from .hooks import HookFinder, get_global_hook_path
 from .vendor import yaml
@@ -38,6 +38,7 @@ class Module(object):
 
         self.path = paths.normalize(path)
         if repo is None:
+            from . import repos
             self.repo = repos.LocalRepo('tmp', paths.parent(self.path))
         else:
             self.repo = repo
