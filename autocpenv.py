@@ -36,16 +36,27 @@ def CleanupDeadlineEventListener(eventListener):
 
 class AutoCpenv(DeadlineEventListener):
     '''
-    Listen for OnSlaveStartingJob events then activate the configured cpenv
-    environment and modules.
+    Listens for OnJobSumitted and OnSlaveStartingJob events. In OnJobSubmitted
+    the cpenv_requirements extrainfo key is set. In OnSlaveStartingJob those
+    requirements are used to activate modules per worker. This ensures that
+    modules are localized to each worker and environment variables are set
+    based on the worker's platform.
+
+    # TODO: OnSlaveStartingJobCallback is disabled because I'm not sure how
+    #       to set process environment variables there yet. Still using the
+    #       GlobalJobPreLoad.py file for the time being. With the goal of
+    #       moving that logic into the OnSlaveStartingJob method.
     '''
 
     def __init__(self):
-        self.OnJobSubmittedCallback += self.OnJobSubmitted
         self._log_prefix = ''
+
+        self.OnJobSubmittedCallback += self.OnJobSubmitted
+        self.OnSlaveStartingJobCallback += self.OnSlaveStartingJob
 
     def Cleanup(self):
         del self.OnJobSubmittedCallback
+        del self.OnSlaveStartingJobCallback
 
     def log(self, message):
         '''Wraps LogInfo to add a prefix to all log messages.'''
@@ -54,8 +65,10 @@ class AutoCpenv(DeadlineEventListener):
 
     def OnJobSubmitted(self, job):
         '''
-        Responsible for resolving modules and setting a Job's environment
-        variables.
+        Responsible for finding cpenv requirements for a job and setting
+        the cpenv_requirements extrainfo key. Later in the OnSlaveStartingJob
+        callback these requirements are used to activate modules for
+        each worker.
         '''
 
         job_plugin = job.JobPlugin
@@ -74,12 +87,7 @@ class AutoCpenv(DeadlineEventListener):
         configure_autocpenv(self.log)
 
         self.log('Attempting to find requirements...')
-        requirements = return_first_result(
-            (self.resolve_from_environment, (job,)),
-            (self.resolve_from_job_environment, (job,)),
-            (self.resolve_from_job_scenefile, (job,)),
-            (self.resolve_from_job_plugin, (plugin_mapping, job_plugin)),
-        )
+        requirements = self.find_requirements(job, job_plugin, plugin_mapping)
 
         if not requirements:
             self.log('Error! Failed 4 attempts to find requirements...')
@@ -98,7 +106,55 @@ class AutoCpenv(DeadlineEventListener):
         self.log('Saving Job.')
         RepositoryUtils.SaveJob(job)
 
-    def resolve_from_environment(self, job):
+    def OnSlaveStartingJob(self, string, job):
+        '''
+        Responsible for activating modules saved in the cpenv_requirements
+        extrainfo key for a job. Each worker must activate modules themselves,
+        which will cause them to localize modules, then set environment
+        variables specific to the workers machine.
+        '''
+
+        # Get job cpenv requirements
+        requirements = job.GetJobExtraInfoKeyValue('cpenv_requirements')
+        if not requirements:
+            self.log(
+                'Skipping cpenv OnSlaveStartingJob: '
+                'Job has no cpenv requirements.'
+            )
+            return
+
+        # read config and setup cpenv
+        configure_autocpenv(self.log)
+
+        # activate requirements
+        requirements = requirements.split()
+        try:
+            modules = cpenv.activate(requirements)
+            self.log('- Activated {} modules...'.format(len(modules)))
+        except Exception:
+            self.log('Failed to activate cpenv modules.')
+            self.log(traceback.format_exc())
+
+        self.log('- Worker Environment...')
+        for k, v in sorted(os.environ.items()):
+            self.log('  {}: {}'.format(k, v))
+
+    def find_requirements(self, job, job_plugin, plugin_mapping):
+        '''Attempts to locate the requirements for a job.
+
+        1. In the current process' os.environ
+        2. In the current job's Environment
+        3. Resolved from the job's scenefile (.cpenv file could be present)
+        4. From the autocpenv plugin_mapping configuration
+        '''
+        return first_result(
+            (self._resolve_from_environment, (job,)),
+            (self._resolve_from_job_environment, (job,)),
+            (self._resolve_from_job_scenefile, (job,)),
+            (self._resolve_from_job_plugin, (plugin_mapping, job_plugin)),
+        )
+
+    def _resolve_from_environment(self, job):
         '''Checks the environment of the local machine that's submitting the
         job for the CPENV_ACTIVE_MODULES variable.'''
 
@@ -111,7 +167,7 @@ class AutoCpenv(DeadlineEventListener):
 
         return split_path(requirements)
 
-    def resolve_from_job_environment(self, job):
+    def _resolve_from_job_environment(self, job):
         '''Resolve modules from job CPENV_ACTIVE_MODULES variable.'''
 
         self.log('Checking job environment for module requirements...')
@@ -123,7 +179,7 @@ class AutoCpenv(DeadlineEventListener):
 
         return split_path(requirements)
 
-    def resolve_from_job_scenefile(self, job):
+    def _resolve_from_job_scenefile(self, job):
         '''Attempt to resolve modules from the jobs scene_file.
 
         Walks up the path until a .cpenv file is found.
@@ -143,7 +199,7 @@ class AutoCpenv(DeadlineEventListener):
         except cpenv.ResolveError:
             pass
 
-    def resolve_from_job_plugin(self, plugin_mapping, job_plugin):
+    def _resolve_from_job_plugin(self, plugin_mapping, job_plugin):
         '''Attempt to resolve modules using the Autocpenv event plugins
         configured plugin mapping.
         '''
@@ -191,7 +247,9 @@ class EventLogReporter(object):
             self.log('  ' + label)
 
 
-def return_first_result(*funcs):
+def first_result(*funcs):
+    '''Returns the first non-None result from a list of funcs.'''
+
     for func, args in funcs:
         result = func(*args)
         if result:
