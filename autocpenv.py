@@ -75,8 +75,9 @@ class AutoCpenv(DeadlineEventListener):
 
         self.log('Attempting to find requirements...')
         requirements = return_first_result(
-            (self.resolve_from_environment, (job,)),
+            (self.resolve_from_job_extra_info, (job,)),
             (self.resolve_from_job_environment, (job,)),
+            (self.resolve_from_environment, (job,)),
             (self.resolve_from_job_scenefile, (job,)),
             (self.resolve_from_job_plugin, (plugin_mapping, job_plugin)),
         )
@@ -110,6 +111,18 @@ class AutoCpenv(DeadlineEventListener):
             return
 
         return split_path(requirements)
+
+    def resolve_from_job_extra_info(self, job):
+        '''Checks to see if the job was submitted with cpenv_requirements.'''
+
+        self.log('Checking job extra info for module requirements...')
+
+        requirements = job.GetJobExtraInfoKeyValue('cpenv_requirements')
+        if not requirements:
+            plugin.LogInfo('Job has no cpenv requirements...')
+            return
+
+        return requirements.split()
 
     def resolve_from_job_environment(self, job):
         '''Resolve modules from job CPENV_ACTIVE_MODULES variable.'''
