@@ -106,7 +106,6 @@ class Activator(object):
 
     def combine_modules(self, modules):
         '''Combine a list of module's environments.'''
-
         return mappings.join_dicts(*[obj.environment for obj in modules])
 
     def activate(self, module_specs):
@@ -287,7 +286,7 @@ def system_path_resolver(resolver, path):
     if is_system_path:
         mod_path = paths.normalize(path)
         if is_module(mod_path):
-            resolved = Module(mod_path).as_spec()
+            resolved = Module(mod_path).to_spec()
             resolver.reporter.resolve_requirement(path, resolved)
             return resolved
 

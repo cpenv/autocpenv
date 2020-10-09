@@ -14,6 +14,12 @@ from .hooks import HookFinder, get_global_hook_path
 from .vendor import yaml
 
 
+__all__ = [
+    'Module',
+    'ModuleSpec',
+]
+
+
 module_header = '''
 # Variables
 # $MODULE - path to this module
@@ -39,7 +45,7 @@ class Module(object):
         self.path = paths.normalize(path)
         if repo is None:
             from . import repos
-            self.repo = repos.LocalRepo('tmp', paths.parent(self.path))
+            self.repo = repos.LocalRepo('_tmp', paths.parent(self.path))
         else:
             self.repo = repo
 
@@ -59,7 +65,7 @@ class Module(object):
         }
         self._raw_config = None
         self._config = None
-        self._environ = None
+        self._env = None
 
         # Determine name, version, qual_name, and real_name
 
@@ -110,23 +116,27 @@ class Module(object):
             self.version,
         )
 
-    def as_spec(self):
-        return ModuleSpec(
-            name=self.name,
-            real_name=self.real_name,
-            qual_name=self.qual_name,
-            version=self.version,
-            path=self.path,
-            repo=self.repo,
-        )
-
     @classmethod
     def from_spec(cls, module_spec):
+        '''Create a module from a ModuleSpec object.'''
+
         return cls(
             name=module_spec.name,
             version=module_spec.version.string,
             path=module_spec.path,
             repo=module_spec.repo,
+        )
+
+    def to_spec(self, **kwargs):
+        '''Return a ModuleSpec object for this Module.'''
+
+        return ModuleSpec(
+            name=kwargs.get('name', self.name),
+            path=kwargs.get('path', self.path),
+            qual_name=kwargs.get('qual_name', self.qual_name),
+            real_name=kwargs.get('real_name', self.real_name),
+            repo=kwargs.get('repo', self.repo),
+            version=kwargs.get('version', self.version),
         )
 
     def relative_path(self, *args):
@@ -140,18 +150,6 @@ class Module(object):
         hook = self.hook_finder(hook_name)
         if hook:
             return hook.run(self)
-
-    def spec(self, **kwargs):
-        '''Return a ModuleSpec object for this Module.'''
-
-        return ModuleSpec(
-            name=kwargs.get('name', self.name),
-            real_name=kwargs.get('real_name', self.real_name),
-            qual_name=kwargs.get('qual_name', self.qual_name),
-            path=kwargs.get('path', self.path),
-            version=kwargs.get('version', self.version),
-            repo=kwargs.get('repo', None),
-        )
 
     def activate(self):
         '''Add this module to active modules'''
@@ -169,25 +167,6 @@ class Module(object):
         paths.rmtree(self.path)
         api.remove_active_module(self)
         self.run_hook('post_remove')
-
-    @property
-    def icon(self):
-        return self.relative_path('icon.png')
-
-    def has_icon(self):
-        return os.path.isfile(self.icon)
-
-    @property
-    def description(self):
-        return self.config.get('description', '')
-
-    @property
-    def author(self):
-        return self.config.get('author', '')
-
-    @property
-    def email(self):
-        return self.config.get('email', '')
 
     @property
     def is_active(self):
@@ -226,16 +205,36 @@ class Module(object):
         return self._config
 
     @property
-    def environment(self):
-        if self._environ is None:
-            env = self.config.get('environment', {})
-            additional = {
-                'CPENV_ACTIVE_MODULES': [self.real_name],
-            }
-            env = mappings.join_dicts(additional, env)
-            self._environ = mappings.preprocess_dict(env)
+    def author(self):
+        return self.config.get('author', '')
 
-        return self._environ
+    @property
+    def description(self):
+        return self.config.get('description', '')
+
+    @property
+    def email(self):
+        return self.config.get('email', '')
+
+    @property
+    def environment(self):
+        if self._env is None:
+            self._env = self.config.get('environment', {})
+            self._env['CPENV_ACTIVE_MODULES'] = {'append': self.real_name}
+
+        return self._env
+
+    @property
+    def requires(self):
+        return self.config.get('email', [])
+
+    @property
+    def icon(self):
+        return self.relative_path('icon.png')
+
+    @property
+    def has_icon(self):
+        return os.path.isfile(self.icon)
 
 
 def read_raw_config(module_file):
@@ -330,11 +329,12 @@ def is_exact_match(requirement, module_spec):
 
     name, version = parse_module_requirement(requirement)
     return (
-        module_spec.qual_name == requirement or
-        module_spec.real_name == requirement or
-        (
-            version and module_spec.name == name and
-            module_spec.version == version
+        module_spec.qual_name == requirement
+        or module_spec.real_name == requirement
+        or (
+            version
+            and module_spec.name == name
+            and module_spec.version == version
         )
     )
 
