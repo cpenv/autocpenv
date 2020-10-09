@@ -155,9 +155,11 @@ class AutoCpenv(DeadlineEventListener):
         return requirements
 
 
-class EventLogReporter(object):
+class EventLogReporter(cpenv.Reporter):
 
-    log = None  # Injected in GlobalJobPreLoad
+    def __init__(self, log):
+        super(EventLogReporter, self).__init__()
+        self.log = log
 
     def start_resolve(self, requirements):
         self.log('- Resolving requirements...')
@@ -219,6 +221,7 @@ def configure_autocpenv(log_method=None):
 
     log_method = log_method or print
     log_method('Configuring cpenv...')
+
     autocpenv = RepositoryUtils.GetEventPluginDirectory('autocpenv')
     if autocpenv not in sys.path:
         sys.path.insert(1, autocpenv)
@@ -241,11 +244,7 @@ def configure_autocpenv(log_method=None):
         cpenv.add_repo(repo)
 
     # Setup reporting
-    class _EventLogReporter(EventLogReporter, cpenv.Reporter):
-        '''Inject log method and mix with cpenv.Reporter baseclass.'''
-        log = log_method
-
-    cpenv.set_reporter(_EventLogReporter)
+    cpenv.set_reporter(EventLogReporter(log_method))
 
 
 def GlobalJobPreLoad(plugin):
