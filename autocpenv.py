@@ -106,7 +106,7 @@ class AutoCpenv(DeadlineEventListener):
 
         requirements = job.GetJobExtraInfoKeyValue('cpenv_requirements')
         if not requirements:
-            plugin.LogInfo('Job has no cpenv requirements...')
+            self.log('Job has no cpenv requirements...')
             return
 
         return requirements.split()
