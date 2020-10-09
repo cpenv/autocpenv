@@ -99,19 +99,6 @@ class AutoCpenv(DeadlineEventListener):
         self.log('Saving Job.')
         RepositoryUtils.SaveJob(job)
 
-    def resolve_from_environment(self, job):
-        '''Checks the environment of the local machine that's submitting the
-        job for the CPENV_ACTIVE_MODULES variable.'''
-
-        self.log('Checking local environment for module requirements...')
-
-        requirements = os.getenv('CPENV_ACTIVE_MODULES')
-        if not requirements:
-            self.log('  CPENV_ACTIVE_MODULES not set...')
-            return
-
-        return split_path(requirements)
-
     def resolve_from_job_extra_info(self, job):
         '''Checks to see if the job was submitted with cpenv_requirements.'''
 
@@ -130,6 +117,19 @@ class AutoCpenv(DeadlineEventListener):
         self.log('Checking job environment for module requirements...')
 
         requirements = job.GetJobEnvironmentKeyValue('CPENV_ACTIVE_MODULES')
+        if not requirements:
+            self.log('  CPENV_ACTIVE_MODULES not set...')
+            return
+
+        return split_path(requirements)
+
+    def resolve_from_environment(self, job):
+        '''Checks the environment of the local machine that's submitting the
+        job for the CPENV_ACTIVE_MODULES variable.'''
+
+        self.log('Checking local environment for module requirements...')
+
+        requirements = os.getenv('CPENV_ACTIVE_MODULES')
         if not requirements:
             self.log('  CPENV_ACTIVE_MODULES not set...')
             return
