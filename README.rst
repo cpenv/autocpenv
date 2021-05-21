@@ -2,7 +2,7 @@
 autocpenv
 =========
 
-Deadline Event Plugin that automatically activates a cpenv environment when a slave starts rendering a task.
+Deadline Event Plugin that automatically activates a cpenv environment when a worker starts rendering a task.
 
 
 Installation
