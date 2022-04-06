@@ -29,6 +29,16 @@ Required=False
 Default=
 Description=Mapping of deadline plugins to cpenv environments. Each line should start with a deadline plugin and end with a space separate list of cpenv environment paths.
 
+[forced_plugin_mapping]
+Type=multilinestring
+Category=Options
+CategoryOrder=0
+Index=4
+Label=Forced Plugin Mapping
+Required=False
+Default=
+Description=Forced mapping of deadline plugins to cpenv environments. These plugins will be appended to whatever mapping is already applied to the job. Each line should start with a deadline plugin and end with a space separate list of cpenv environment paths.
+
 [ShotgunRepo_enable]
 Type=boolean
 Category=Repos
