@@ -2,7 +2,7 @@
 autocpenv
 =========
 
-Deadline Event Plugin that automatically activates a cpenv environment when a worker starts rendering a task.
+Deadline Event Plugin that automatically activates cpenv requirements when a worker starts rendering a task. When submitting a job, this event plugin will check the user's CPENV_ACTIVATE_MODULES Environment variable for modules. If CPENV_ACTIVE_MODULES is undefined, the event will fallback to the requirements specified in the Plugin Mapping setting.
 
 
 Installation
@@ -32,9 +32,10 @@ Options
 -------
 - State: How this event plug-in should respond to events. If Global, all jobs and workers will trigger the events for this plugin. If Opt-In, jobs and workers can choose to trigger the events for this plugin. If Disabled, no events are triggered for this plugin.
 - CPENV_HOME: Path to cpenv home. Defaults to a local directory. Can be set to a shared network location. Place a config.yml file within the home directory to configure repositories. See the cpenv documentation for more info.
-- Plugin Mapping: Mapping of deadline plugins to cpenv environments. Each line should start with a deadline plugin and end with a space separate list of cpenv environment paths.
+- Plugin Mapping: Mapping of deadline plugins to cpenv requirements. Each line should start with a deadline plugin and end with a space separate list of cpenv requirements.
  + Each line configures a Deadline Plugin
  + **{Deadline_Plugin}={cpenv_module}**
+- Forced Plugin Mapping: These cpenv requirements are always added to a job's environment. This allows you to ensure that certain requirements are always available for specific deadline plugins. The formatting is the same as Plugin Mapping.
 - Enable Shotgun Repo: `Setup a Shotgun api script <https://support.shotgunsoftware.com/hc/en-us/articles/219031368-Create-and-manage-API-scripts>`_
  + Shotgun URL: Path to Shotgun site (https://my.shotgunstudio.com)
  + Api Script Name
