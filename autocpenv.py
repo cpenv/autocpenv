@@ -83,9 +83,12 @@ class AutoCpenv(DeadlineEventListener):
         )
 
         forced_requirements = self.resolve_from_job_plugin(self.GetConfigEntry('forced_plugin_mapping'), job_plugin)
-        self.log("Forced requirements (these will be appended to the job requirements):")
-        self.log(" ".join(forced_requirements))
-        requirements.extend(forced_requirements)
+        if forced_requirements:
+            self.log("Forced requirements (these will be appended to the job requirements):")
+            self.log(" ".join(forced_requirements))
+            requirements.extend(forced_requirements)
+        else:
+            self.log("No forced requirements found in the Forced Plugin Mapping settings...")
 
         if not requirements:
             self.log('Error! Failed 4 attempts to find requirements...')
@@ -161,14 +164,14 @@ class AutoCpenv(DeadlineEventListener):
         except cpenv.ResolveError:
             pass
 
-    def resolve_from_job_plugin(self, plugin_setting, job_plugin):
+    def resolve_from_job_plugin(self, plugin_mapping, job_plugin):
         '''Attempt to resolve modules using the Autocpenv event plugins
         configured plugin mapping.
         '''
 
-        self.log('Checking job {} for module requirements...'.format(plugin_setting))
+        self.log('Checking job {} for module requirements...'.format(plugin_mapping))
 
-        plugin_mapping = plugin_mapping_to_dict(plugin_setting)
+        plugin_mapping = plugin_mapping_to_dict(plugin_mapping)
         requirements = plugin_mapping.get(job_plugin, None)
         return requirements
 
