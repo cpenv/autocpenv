@@ -304,7 +304,7 @@ def GlobalJobPreLoad(plugin):
     requirements = job.GetJobExtraInfoKeyValue('cpenv_requirements')
     if not requirements:
         plugin.LogInfo('Job has no cpenv requirements...')
-        #return
+        return
 
     # Read config from autocpenv EventPlugin
     configure_autocpenv(plugin.LogInfo)
