@@ -2,7 +2,7 @@
 autocpenv
 =========
 
-Deadline Event Plugin that automatically activates cpenv requirements when a worker starts rendering a task. When submitting a job, this event plugin will check the user's CPENV_ACTIVATE_MODULES Environment variable for modules. If CPENV_ACTIVE_MODULES is undefined, the event will fallback to the requirements specified in the Plugin Mapping setting.
+Deadline Event Plugin that automatically activates cpenv requirements when a worker starts rendering a task. When submitting a job, this event plugin will check the user's CPENV_ACTIVE_MODULES Environment variable for modules. If CPENV_ACTIVE_MODULES is undefined, the event will fallback to the requirements specified in the Plugin Mapping setting.
 
 
 Installation
