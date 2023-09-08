@@ -8,19 +8,18 @@ from collections import namedtuple
 from string import Template
 
 # Local imports
-from . import compat, mappings, paths
-from .versions import ParseError, Version, default_version, parse_version
+from . import compat, paths
 from .hooks import HookFinder, get_global_hook_path
 from .vendor import yaml
-
+from .versions import ParseError, Version, default_version, parse_version
 
 __all__ = [
-    'Module',
-    'ModuleSpec',
+    "Module",
+    "ModuleSpec",
 ]
 
 
-module_header = '''
+module_header = """
 # Variables
 # $MODULE - path to this module
 # $PLATFORM - platform name (win, mac, linux)
@@ -29,39 +28,38 @@ module_header = '''
 # Wrap variables in brackets when they are nested within a string.
 #     DO 'this${variable}isnested/' NOT 'this$variableisnested'
 
-'''
+"""
 
 
 ModuleSpec = namedtuple(
-    'ModuleSpec',
-    ['name', 'real_name', 'qual_name', 'version', 'path', 'repo'],
+    "ModuleSpec",
+    ["name", "real_name", "qual_name", "version", "path", "repo"],
 )
 
 
 class Module(object):
-
     def __init__(self, path, name=None, version=None, repo=None):
-
         self.path = paths.normalize(path)
         if repo is None:
             from . import repos
-            self.repo = repos.LocalRepo('_tmp', paths.parent(self.path))
+
+            self.repo = repos.LocalRepo("_tmp", paths.parent(self.path))
         else:
             self.repo = repo
 
         # Create HookFinder for this module
-        self.hook_path = self.relative_path('hooks')
+        self.hook_path = self.relative_path("hooks")
         self.hook_finder = HookFinder(
             self.hook_path,
             get_global_hook_path(),
         )
 
         # Setup config
-        self.config_path = self.relative_path('module.yml')
+        self.config_path = self.relative_path("module.yml")
         self.config_vars = {
-            'MODULE': self.path,
-            'PLATFORM': compat.platform,
-            'PYVER': sys.version[:3],
+            "MODULE": self.path,
+            "PLATFORM": compat.platform,
+            "PYVER": sys.version[:3],
         }
         self._raw_config = None
         self._config = None
@@ -70,17 +68,15 @@ class Module(object):
         # Determine name, version, qual_name, and real_name
 
         if name and version:
-
             # Use name and version if explicitly passed
             self.name = name
             self.version = parse_version(version)
 
         else:
-
             # Check config
             if self.exists:
-                name = self.config.get('name', None)
-                version = self.config.get('version', None)
+                name = self.config.get("name", None)
+                version = self.config.get("version", None)
                 if version:
                     version = parse_version(version)
 
@@ -91,7 +87,7 @@ class Module(object):
             self.name = name
             self.version = version
 
-        self.qual_name = self.name + '-' + self.version.string
+        self.qual_name = self.name + "-" + self.version.string
 
         base_name = os.path.basename(self.path)
         if self.version.string != base_name:
@@ -100,7 +96,7 @@ class Module(object):
             self.real_name = self.qual_name
 
     def __eq__(self, other):
-        if hasattr(other, 'path'):
+        if hasattr(other, "path"):
             return self.path == other.path
         else:
             return self.path == other
@@ -118,7 +114,7 @@ class Module(object):
 
     @classmethod
     def from_spec(cls, module_spec):
-        '''Create a module from a ModuleSpec object.'''
+        """Create a module from a ModuleSpec object."""
 
         return cls(
             name=module_spec.name,
@@ -128,49 +124,52 @@ class Module(object):
         )
 
     def to_spec(self, **kwargs):
-        '''Return a ModuleSpec object for this Module.'''
+        """Return a ModuleSpec object for this Module."""
 
         return ModuleSpec(
-            name=kwargs.get('name', self.name),
-            path=kwargs.get('path', self.path),
-            qual_name=kwargs.get('qual_name', self.qual_name),
-            real_name=kwargs.get('real_name', self.real_name),
-            repo=kwargs.get('repo', self.repo),
-            version=kwargs.get('version', self.version),
+            name=kwargs.get("name", self.name),
+            path=kwargs.get("path", self.path),
+            qual_name=kwargs.get("qual_name", self.qual_name),
+            real_name=kwargs.get("real_name", self.real_name),
+            repo=kwargs.get("repo", self.repo),
+            version=kwargs.get("version", self.version),
         )
 
     def relative_path(self, *args):
-        '''Get a path relative to this module'''
+        """Get a path relative to this module"""
 
         return paths.normalize(self.path, *args)
 
     def run_hook(self, hook_name):
-        '''Run a module hook by name, fallback to global hook location.'''
+        """Run a module hook by name, fallback to global hook location."""
 
         hook = self.hook_finder(hook_name)
         if hook:
             return hook.run(self)
 
     def activate(self):
-        '''Add this module to active modules'''
+        """Add this module to active modules"""
 
         from . import api
-        self.run_hook('pre_activate')
+
+        self.run_hook("pre_activate")
         api.add_active_module(self)
-        self.run_hook('post_activate')
+        self.run_hook("post_activate")
 
     def remove(self):
-        '''Delete this module'''
+        """Delete this module"""
 
         from . import api
-        self.run_hook('pre_remove')
+
+        self.run_hook("pre_remove")
         paths.rmtree(self.path)
         api.remove_active_module(self)
-        self.run_hook('post_remove')
+        self.run_hook("post_remove")
 
     @property
     def is_active(self):
         from . import api
+
         return self.real_name in api.get_active_modules()
 
     @property
@@ -191,7 +190,6 @@ class Module(object):
     @property
     def config(self):
         if self._config is None:
-
             if not self.raw_config:
                 self._config = {}
                 return self._config
@@ -206,31 +204,31 @@ class Module(object):
 
     @property
     def author(self):
-        return self.config.get('author', '')
+        return self.config.get("author", "")
 
     @property
     def description(self):
-        return self.config.get('description', '')
+        return self.config.get("description", "")
 
     @property
     def email(self):
-        return self.config.get('email', '')
+        return self.config.get("email", "")
 
     @property
     def environment(self):
         if self._env is None:
-            self._env = self.config.get('environment', {})
-            self._env['CPENV_ACTIVE_MODULES'] = {'append': self.real_name}
+            self._env = self.config.get("environment", {})
+            self._env["CPENV_ACTIVE_MODULES"] = {"append": self.real_name}
 
         return self._env
 
     @property
     def requires(self):
-        return self.config.get('email', [])
+        return self.config.get("email", [])
 
     @property
     def icon(self):
-        return self.relative_path('icon.png')
+        return self.relative_path("icon.png")
 
     @property
     def has_icon(self):
@@ -238,47 +236,43 @@ class Module(object):
 
 
 def read_raw_config(module_file):
-    ''''Read the raw text data of a module.yml file'''
+    """'Read the raw text data of a module.yml file"""
 
-    with open(module_file, 'r') as f:
+    with open(module_file, "r") as f:
         return f.read()
 
 
 def read_config(module_file, config_vars=None, data=None):
-    '''Read and formats a module.yml file'''
+    """Read and formats a module.yml file"""
 
     if config_vars is None:
         config_vars = {
-            'MODULE': paths.parent(module_file),
-            'PLATFORM': compat.platform,
-            'PYVER': sys.version[:3],
+            "MODULE": paths.parent(module_file),
+            "PLATFORM": compat.platform,
+            "PYVER": sys.version[:3],
         }
 
     if data is None:
-        with open(module_file, 'r') as f:
+        with open(module_file, "r") as f:
             data = f.read()
 
     return yaml.safe_load(Template(data).safe_substitute(config_vars))
 
 
 def sort_modules(modules, reverse=False):
-    '''Sort a list of Modules or ModuleSpecs by version.'''
+    """Sort a list of Modules or ModuleSpecs by version."""
 
-    return sorted(
-        modules,
-        key=lambda m: (m.real_name, m.version),
-        reverse=reverse
-    )
+    return sorted(modules, key=lambda m: (m.real_name, m.version), reverse=reverse)
 
 
 def is_module(path):
-    '''Returns True if path refers to a module'''
+    """Returns True if path refers to a module"""
 
-    return os.path.exists(paths.normalize(path, 'module.yml'))
+    return os.path.exists(paths.normalize(path, "module.yml"))
 
 
 def parse_module_path(path, default_version=default_version):
-    '''Return name and version from a module's path.'''
+    """Return name and version from a module's path."""
 
     basename = os.path.basename(path)
 
@@ -291,9 +285,9 @@ def parse_module_path(path, default_version=default_version):
             default = default_version
         return basename, default
 
-    head = basename.replace(version.string, '')
+    head = basename.replace(version.string, "")
     if head:
-        name = head.rstrip('_v').rstrip('-v').rstrip('-_')
+        name = head.rstrip("_v").rstrip("-v").rstrip("-_")
     else:
         name = os.path.basename(os.path.dirname(path))
 
@@ -301,9 +295,9 @@ def parse_module_path(path, default_version=default_version):
 
 
 def parse_module_requirement(requirement, default_version=None):
-    '''Given a requirement, return a name and version.'''
+    """Given a requirement, return a name and version."""
 
-    if '\\' in requirement or '/' in requirement:
+    if "\\" in requirement or "/" in requirement:
         # Probably a system path - lets parse it.
         return parse_module_path(requirement, default_version=default_version)
 
@@ -317,40 +311,34 @@ def parse_module_requirement(requirement, default_version=None):
         return requirement, default
 
     name = requirement
-    head = requirement.replace(version.string, '')
+    head = requirement.replace(version.string, "")
     if head:
-        name = head.rstrip('_v').rstrip('-v').rstrip('-_').rstrip('<>=!')
+        name = head.rstrip("_v").rstrip("-v").rstrip("-_").rstrip("<>=!")
 
     return name, version
 
 
 def is_exact_match(requirement, module_spec):
-    '''Is the module_spec an exact match for the provided requirement?'''
+    """Is the module_spec an exact match for the provided requirement?"""
 
     name, version = parse_module_requirement(requirement)
     return (
         module_spec.qual_name == requirement
         or module_spec.real_name == requirement
-        or (
-            version
-            and module_spec.name == name
-            and module_spec.version == version
-        )
+        or (version and module_spec.name == name and module_spec.version == version)
     )
 
 
 def is_partial_match(requirement, module_spec):
-    '''Is the module_spec a partial match for the provided requirement?'''
+    """Is the module_spec a partial match for the provided requirement?"""
 
     name, version = parse_module_requirement(requirement)
     return module_spec.name == name
 
 
 def best_match(requirement, module_specs):
-
     name, version = parse_module_requirement(
-        requirement,
-        Version(0, 0, 0, None, None, '*')
+        requirement, Version(0, 0, 0, None, None, "*")
     )
 
     best_match = None
