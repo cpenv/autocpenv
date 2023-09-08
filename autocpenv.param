@@ -54,7 +54,7 @@ CategoryOrder=2
 Index=2
 Label=Ignore Missing Modules
 Default=False
-Description=Ignore missing modules and continue activating any existing modules
+Description=Ignore missing modules and continue activating any existing modules.
 
 [repos]
 Type=multilinestring
