@@ -3,74 +3,113 @@ Type=Enum
 Category=Options
 CategoryOrder=0
 Index=0
-Items=Global Enabled;Opt-In;Disabled
+Items=Global Enabled;Disabled
 Label=State
 Default=Disabled
 Description=How this event plug-in should respond to events. If Global, all jobs and slaves will trigger the events for this plugin. If Opt-In, jobs and slaves can choose to trigger the events for this plugin. If Disabled, no events are triggered for this plugin.
 
-[cpenv_home]
-Type=folder
-Category=Options
-CategoryOrder=0
-Index=1
-Label=CPENV_HOME
-Default=
-Required=False
-Description=Path to cpenv home. Defaults to a local directory. Can be set to a shared network location. Place a config.yml file within the home directory to
-configure repositories. See the cpenv documentation for more info.
-
 [plugin_mapping]
 Type=multilinestring
-Category=Options
-CategoryOrder=0
-Index=3
-Label=Plugin Mapping
+Category=Job Submission
+CategoryOrder=1
+Index=1
+Label=Default Plugin Mapping
 Required=False
 Default=
 Description=Mapping of deadline plugins to cpenv environments. Each line should start with a deadline plugin and end with a space separate list of cpenv environment paths.
 
 [forced_plugin_mapping]
 Type=multilinestring
-Category=Options
-CategoryOrder=0
-Index=4
+Category=Job Submission
+CategoryOrder=1
+Index=2
 Label=Forced Plugin Mapping
 Required=False
 Default=
 Description=Forced mapping of deadline plugins to cpenv environments. These plugins will be appended to whatever mapping is already applied to the job. Each line should start with a deadline plugin and end with a space separate list of cpenv environment paths.
 
-[ShotgunRepo_enable]
-Type=boolean
-Category=Repos
-CategoryOrder=1
+[opt_out]
+Type=string
+Category=Job Preload
+CategoryOrder=2
 Index=0
-Label=Enable Shotgun Repo
-Default=False
-Description=Enable a Shotgun Repository of cpenv modules.
+Label=Opt-Out
+Default=
+Description=Space separated list of wildcard patterns, like aws-*, group names, or worker names to exclude from running the autocpenv GlobalJobPreload script. The GlobalJobPreload script is responsible for activating cpenv modules on a worker prior to rendering a Job's tasks.
 
-[ShotgunRepo_base_url]
-Type=string
-Category=Repos
-CategoryOrder=1
+[cpenv_home]
+Type=folder
+Category=Job Preload
+CategoryOrder=2
 Index=1
-Label=Shotgun URL
+Label=CPENV_HOME
 Default=
-Description=Path to Shotgun site (https://my.shotgunstudio.com)
+Required=False
+Description=Path to cpenv home. Defaults to a local directory. Can be set to a shared network location. Place a config.yml file within the home directory to configure repositories. See the cpenv documentation for more info.
 
-[ShotgunRepo_script_name]
-Type=string
-Category=Repos
-CategoryOrder=1
+[ignore_missing]
+Type=boolean
+Category=Job Preload
+CategoryOrder=2
 Index=2
-Label=Api Script Name
-Default=
-Description=Name of Shotgun api script
+Label=Ignore Missing Modules
+Default=False
+Description=Ignore missing modules and continue activating any existing modules
 
-[ShotgunRepo_api_key]
-Type=string
-Category=Repos
-CategoryOrder=1
+[repos]
+Type=multilinestring
+Category=Job Preload
+CategoryOrder=2
 Index=3
-Label=Api Script Key
+Label=Repositories
+Required=False
 Default=
-Description=Key of Shotgun api script
+Description=JSON formatted list of repositories to configure. These repositories will be used to resolve modules for the specified group.
+
+[Group0_enable]
+Type=boolean
+Category=Group0 Overrides
+CategoryOrder=3
+Index=0
+Label=Enable Group Override
+Default=False
+Description=Enable overrides for a particular group.
+
+[Group0_group]
+Type=string
+Category=Group0 Overrides
+CategoryOrder=3
+Index=1
+Label=Group
+Default=
+Required=False
+Description=The name of the group to apply a group override to.
+
+[Group0_cpenv_home]
+Type=folder
+Category=Group0 Overrides
+CategoryOrder=3
+Index=2
+Label=CPENV_HOME
+Default=
+Required=False
+Description=Path to cpenv home. Defaults to a local directory. Can be set to a shared network location. Place a config.yml file within the home directory to configure repositories. See the cpenv documentation for more info.
+
+[Group0_ignore_missing]
+Type=boolean
+Category=Group0 Overrides
+CategoryOrder=3
+Index=3
+Label=Ignore Missing Modules
+Default=False
+Description=Ignore missing modules and continue activating any existing modules.
+
+[Group0_repos]
+Type=multilinestring
+Category=Group0 Overrides
+CategoryOrder=3
+Index=4
+Label=Repositories
+Required=False
+Default=
+Description=JSON formatted list of repositories to configure. These repositories will be used to resolve modules for the specified group.
