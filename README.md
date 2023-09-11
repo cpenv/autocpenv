@@ -2,7 +2,7 @@
 
 Deadline Event Plugin that automatically activates cpenv requirements when a worker starts rendering a task. When submitting a job, this event plugin will check the user's CPENV_ACTIVE_MODULES Environment variable for modules. If CPENV_ACTIVE_MODULES is undefined, the event will fallback to the requirements specified in the Default Plugin Mapping setting.
 
-**Warning:** This version (v0.6.0+) introduces a new set of options that require reconfiguration. If you need to use the previous version checkout tag v0.5.6.
+**Warning:** v0.6.0+ introduces a new set of options that require reconfiguration. If you need to use the previous version checkout tag v0.5.6.
 
 ## Installation
 1. Clone this git repository into your Deadline repository's custom events location.
