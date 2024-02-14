@@ -1,20 +1,20 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 
+import json
+import os
+import sys
+
 # Standard library imports
 from fnmatch import fnmatch
-import json
-import sys
-import os
-
-# .Net imports
-from System.Diagnostics import *
-from System.IO import *
 
 # Deadline imports
 from Deadline.Events import DeadlineEventListener
 from Deadline.Scripting import RepositoryUtils
 
+# .Net imports
+from System.Diagnostics import *
+from System.IO import *
 
 # Setup system path
 this_path = RepositoryUtils.GetEventPluginDirectory("autocpenv")
@@ -216,7 +216,7 @@ class EventLogReporter(cpenv.Reporter):
         self.log("- Resolving requirements...")
 
     def resolve_requirement(self, requirement, module_spec):
-        self.log("  %s - %s" % (module_spec.real_name, module_spec.path))
+        self.log("  %s - %s" % (module_spec.qual_name, module_spec.path))
 
     def end_resolve(self, resolved, unresolved):
         if unresolved:
@@ -243,7 +243,7 @@ def combine_requirements(a, b):
 
     all_requirements = {}
     for requirement in a + b:
-        name, version = parse_module_requirement(requirement)
+        name, version = cpenv.parse_module_requirement(requirement)
         all_requirements.setdefault(name, [])
         all_requirements[name].append((version, requirement))
 

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import sys
 
+from Deadline.Scripting import RepositoryUtils
 from System.IO import *
-from Deadline.Scripting import *
 
 
 def __main__(plugin):
