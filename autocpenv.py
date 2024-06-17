@@ -241,17 +241,23 @@ def combine_requirements(a, b):
     """Combines two list of requirements, returning the requirements with the
     highest version numbers."""
 
-    all_requirements = {}
-    for requirement in a + b:
-        name, version = cpenv.parse_module_requirement(requirement)
-        all_requirements.setdefault(name, [])
-        all_requirements[name].append((version, requirement))
+    try:
+        all_requirements = {}
+        for requirement in a + b:
+            name, version = cpenv.module.parse_module_requirement(requirement)
+            all_requirements.setdefault(name, [])
+            all_requirements[name].append((version, requirement))
 
-    results = []
-    for name, matches in all_requirements.items():
-        results.append(max(matches, lambda m: m[0])[1])
+        results = []
+        for name, matches in all_requirements.items():
+            results.append(max(matches, lambda m: m[0])[1])
 
-    return results
+        return results
+    except:
+        # TODO: Exception for the following issue:
+        # An error occurred in the "OnJobSubmitted" function in events plugin 'autocpenv': '>'
+        # not supported between instances of 'function' and 'list' (Python.Runtime.PythonException)
+        return a + b
 
 
 def return_first_result(*funcs):
